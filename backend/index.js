@@ -29,6 +29,11 @@ const connectDB = async () => {
 
 const app = express();
 const server = http.createServer(app);
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 
 const io = new Server(server, {
   cors: {
