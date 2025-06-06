@@ -66,7 +66,7 @@ A modern, feature-rich chat application built with React, Node.js, and MongoDB. 
    ```env
    PORT=5000
    NODE_ENV=development
-   CLIENT_URL=http://localhost:5173
+   CLIENT_URL=https://ghostchitchatapp.netlify.app
    MONGO_URI=mongodb://localhost:27017/chatapp
    JWT_SECRET=your_jwt_secret_key_change_in_production
    ```
