@@ -2,22 +2,25 @@
 
 A modern, feature-rich chat application built with React, Node.js, and MongoDB. ChitChat offers a seamless real-time messaging experience with a beautiful, responsive interface.
 
-![ChitChat Screenshot](https://images.pexels.com/photos/3182833/pexels-photo-3182833.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2)
+![alt text](<project/src/assets/Screenshot 2025-06-05 144344.png>)
 
 ## ✨ Features
 
 - **Real-time Messaging**
+
   - Instant message delivery
   - Typing indicators
   - Online/offline status
   - Read receipts
 
 - **User Authentication**
+
   - Secure signup/login
   - JWT-based authentication
   - Protected routes
 
 - **Modern UI/UX**
+
   - Responsive design
   - Dark/light mode
   - Clean, intuitive interface
@@ -31,6 +34,7 @@ A modern, feature-rich chat application built with React, Node.js, and MongoDB. 
 ## 🚀 Tech Stack
 
 - **Frontend**
+
   - React 18
   - Vite
   - Tailwind CSS
@@ -45,17 +49,20 @@ A modern, feature-rich chat application built with React, Node.js, and MongoDB. 
 ## 📦 Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/yourusername/chitchat.git
    cd chitchat
    ```
 
 2. Install dependencies:
+
    ```bash
    npm install
    ```
 
 3. Create a `.env` file in the root directory:
+
    ```env
    PORT=5000
    NODE_ENV=development
@@ -80,10 +87,12 @@ A modern, feature-rich chat application built with React, Node.js, and MongoDB. 
 ## 📱 Screenshots
 
 ### Light Mode
-![Light Mode](https://images.pexels.com/photos/3182834/pexels-photo-3182834.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2)
+
+![alt text](<project/src/assets/Screenshot 2025-06-05 144523.png>)
 
 ### Dark Mode
-![Dark Mode](https://images.pexels.com/photos/3182835/pexels-photo-3182835.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2)
+
+![alt text](<project/src/assets/Screenshot 2025-06-05 144344.png>)
 
 ## 🔒 Security
 

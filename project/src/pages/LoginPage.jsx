@@ -1,47 +1,47 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { FaMoon, FaSun, FaEnvelope, FaLock } from 'react-icons/fa';
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
+import { FaMoon, FaSun, FaEnvelope, FaLock } from "react-icons/fa";
 
 function LoginPage() {
   const [formData, setFormData] = useState({
-    email: '',
-    password: ''
+    email: "",
+    password: "",
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   const { login } = useAuth();
   const { darkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
-    
+
     try {
       const result = await login(formData);
-      
+
       if (result.success) {
-        navigate('/');
+        navigate("/");
       } else {
         setError(result.error);
       }
     } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
-      console.error('Login error:', err);
+      setError("An unexpected error occurred. Please try again.");
+      console.error("Login error:", err);
     } finally {
       setLoading(false);
     }
   };
-  
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900 px-4 sm:px-6 lg:px-8">
       <button
@@ -49,9 +49,13 @@ function LoginPage() {
         className="absolute top-4 right-4 p-2 rounded-full bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors"
         aria-label="Toggle theme"
       >
-        {darkMode ? <FaSun className="w-5 h-5" /> : <FaMoon className="w-5 h-5" />}
+        {darkMode ? (
+          <FaSun className="w-5 h-5" />
+        ) : (
+          <FaMoon className="w-5 h-5" />
+        )}
       </button>
-      
+
       <div className="w-full max-w-md space-y-8 bg-white dark:bg-neutral-800 p-8 rounded-xl shadow-chat dark:shadow-chat-dark animate-fade-in">
         <div>
           <h1 className="text-center text-3xl font-bold text-primary-600 dark:text-primary-500">
@@ -61,13 +65,13 @@ function LoginPage() {
             Sign in to your account
           </h2>
         </div>
-        
+
         {error && (
           <div className="bg-error-500/10 border border-error-500/50 text-error-600 dark:text-error-500 p-3 rounded-lg text-sm">
             {error}
           </div>
         )}
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
@@ -91,7 +95,7 @@ function LoginPage() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="password" className="form-label">
                 Password
@@ -114,7 +118,7 @@ function LoginPage() {
               </div>
             </div>
           </div>
-          
+
           <div>
             <button
               type="submit"
@@ -124,14 +128,14 @@ function LoginPage() {
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                'Sign in'
+                "Sign in"
               )}
             </button>
           </div>
-          
+
           <div className="text-sm text-center">
             <span className="text-neutral-600 dark:text-neutral-400">
-              Don't have an account?{' '}
+              Don't have an account?{" "}
             </span>
             <Link
               to="/register"

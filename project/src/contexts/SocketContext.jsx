@@ -9,16 +9,24 @@ export function useSocket() {
 }
 
 export function SocketProvider({ children }) {
-  const [onlineUsers, setOnlineUsers] = useState([]);
-  const [typingUsers, setTypingUsers] = useState({});
   const { currentUser, isAuthenticated } = useAuth();
   const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null); // keep socket in state to trigger rerenders
+
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [typingUsers, setTypingUsers] = useState({});
 
   useEffect(() => {
     if (isAuthenticated && currentUser) {
       if (!socketRef.current) {
-        const newSocket = io("http://localhost:5000");
+        const newSocket = io("http://localhost:5000", {
+          auth: {
+            token: localStorage.getItem("token") || "", // or from cookies if needed
+          },
+          reconnectionAttempts: 5,
+        });
         socketRef.current = newSocket;
+        setSocket(newSocket);
 
         newSocket.on("connect", () => {
           newSocket.emit("user_login", currentUser._id);
@@ -31,7 +39,7 @@ export function SocketProvider({ children }) {
         newSocket.on("user_status", ({ userId, status }) => {
           setOnlineUsers((prev) =>
             status === "online"
-              ? [...prev, userId]
+              ? [...new Set([...prev, userId])]
               : prev.filter((id) => id !== userId)
           );
         });
@@ -42,17 +50,23 @@ export function SocketProvider({ children }) {
             [userId]: isTyping,
           }));
         });
+
+        newSocket.on("disconnect", () => {
+          setOnlineUsers([]);
+          setTypingUsers({});
+        });
       }
-    } else {
+    }
+
+    return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
+        setSocket(null);
         setOnlineUsers([]);
         setTypingUsers({});
       }
-    }
-    // Only run when auth state changes
-    // eslint-disable-next-line
+    };
   }, [isAuthenticated, currentUser?._id]);
 
   const sendTypingStatus = (receiverId, isTyping) => {
@@ -78,13 +92,13 @@ export function SocketProvider({ children }) {
   };
 
   const value = {
-    socket: socketRef.current,
+    socket,
     onlineUsers,
     typingUsers,
     sendTypingStatus,
     sendMessage,
     isUserOnline: (userId) => onlineUsers.includes(userId),
-    isUserTyping: (userId) => typingUsers[userId] || false,
+    isUserTyping: (userId) => !!typingUsers[userId],
   };
 
   return (

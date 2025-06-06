@@ -15,45 +15,44 @@ function ChatPage() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const { socket } = useSocket();
+
+  const { socket, isUserOnline, isUserTyping, sendTypingStatus, sendMessage } =
+    useSocket();
+  const { api, currentUser, logout } = useAuth();
+  const { darkMode, toggleTheme } = useTheme();
+
   const messagesRef = useRef(messages);
   const selectedUserRef = useRef(selectedUser);
 
-  const { api, currentUser, logout } = useAuth();
-  const { darkMode, toggleTheme } = useTheme();
-  const { isUserOnline, isUserTyping, sendTypingStatus, sendMessage } = useSocket();
-
-  // Restore selected user after users are loaded
-  useEffect(() => {
-    const savedUserId = localStorage.getItem("selectedUserId");
-    if (savedUserId && users.length > 0) {
-      const user = users.find((u) => u._id === savedUserId);
-      if (user) setSelectedUser(user);
-    }
-  }, [users]);
-
-  useEffect(() => {
-    if (selectedUser) {
-      localStorage.setItem("selectedUserId", selectedUser._id);
-    }
-  }, [selectedUser]);
-
+  // Sync refs for socket event handlers
   useEffect(() => {
     messagesRef.current = messages;
     selectedUserRef.current = selectedUser;
   }, [messages, selectedUser]);
 
-  // Fetch users first, then conversations
+  // Load users and conversations on mount
   useEffect(() => {
     const fetchInitialData = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        const usersRes = await api.get("/users");
+        const [usersRes, conversationsRes] = await Promise.all([
+          api.get("/users"),
+          api.get("/messages"),
+        ]);
         setUsers(usersRes.data);
-        const conversationsRes = await api.get("/messages");
+
+        // Restore selected user from localStorage if exists and present in users
+        const savedUserId = localStorage.getItem("selectedUserId");
+        let initialSelectedUser = null;
+        if (savedUserId) {
+          initialSelectedUser =
+            usersRes.data.find((u) => u._id === savedUserId) || null;
+        }
+        setSelectedUser(initialSelectedUser);
+
         setConversations(conversationsRes.data);
-      } catch (error) {
-        console.error("Error fetching initial data:", error);
+      } catch (err) {
+        console.error("Failed to load initial data:", err);
       } finally {
         setLoading(false);
       }
@@ -61,15 +60,27 @@ function ChatPage() {
     fetchInitialData();
   }, [api]);
 
-  // Fetch messages only when selectedUser is set and users are loaded
+  // Save selected user id to localStorage on change
   useEffect(() => {
+    if (selectedUser) {
+      localStorage.setItem("selectedUserId", selectedUser._id);
+    } else {
+      localStorage.removeItem("selectedUserId");
+    }
+  }, [selectedUser]);
+
+  // Fetch messages when selected user changes
+  useEffect(() => {
+    if (!selectedUser) {
+      setMessages([]);
+      return;
+    }
     const fetchMessages = async () => {
-      if (!selectedUser) return;
+      setLoading(true);
       try {
-        setLoading(true);
         const res = await api.get(`/messages/${selectedUser._id}`);
         setMessages(res.data);
-        await api.put(`/messages/read/${selectedUser._id}`);
+        await api.put(`/messages/read/${selectedUser._id}`); // mark read
         setConversations((prev) =>
           prev.map((conv) =>
             conv.user._id === selectedUser._id
@@ -77,56 +88,53 @@ function ChatPage() {
               : conv
           )
         );
-      } catch (error) {
-        console.error("Error fetching messages:", error);
+      } catch (err) {
+        console.error("Failed to fetch messages:", err);
       } finally {
         setLoading(false);
       }
     };
     fetchMessages();
-  }, [selectedUser, api, users.length]);
+  }, [selectedUser, api]);
 
+  // Socket event: handle incoming messages
   useEffect(() => {
     if (!socket) return;
+
     const handleIncomingMessage = (data) => {
+      // Check if the message involves current user
+      const otherUserId =
+        data.senderId === currentUser._id ? data.receiverId : data.senderId;
+
       setConversations((prev) => {
-        const idx = prev.findIndex(
-          (c) => c.user._id === data.senderId || c.user._id === data.receiverId
-        );
-        if (idx > -1) {
-          const updated = [...prev];
-          updated[idx] = {
-            ...updated[idx],
-            lastMessage: {
-              content: data.message,
-              createdAt: data.timestamp,
-              sender: data.senderId,
-            },
-            unreadCount:
-              selectedUserRef.current &&
-              (data.senderId === selectedUserRef.current._id ||
-                data.receiverId === selectedUserRef.current._id)
-                ? 0
-                : (updated[idx].unreadCount || 0) + 1,
-          };
-          const [conv] = updated.splice(idx, 1);
-          updated.unshift(conv);
-          return updated;
-        } else {
-          return prev;
-        }
+        let idx = prev.findIndex((c) => c.user._id === otherUserId);
+        if (idx === -1) return prev;
+
+        const updated = [...prev];
+        const isSelectedUser = selectedUserRef.current?._id === otherUserId;
+
+        updated[idx] = {
+          ...updated[idx],
+          lastMessage: {
+            content: data.message,
+            createdAt: data.timestamp,
+            sender: data.senderId,
+          },
+          unreadCount: isSelectedUser ? 0 : (updated[idx].unreadCount || 0) + 1,
+        };
+
+        // Move updated conversation to top
+        const [conv] = updated.splice(idx, 1);
+        updated.unshift(conv);
+        return updated;
       });
 
-      // Only add message if it's for the currently selected user
-      if (
-        selectedUserRef.current &&
-        (data.senderId === selectedUserRef.current._id ||
-          data.receiverId === selectedUserRef.current._id)
-      ) {
+      // Add message to messages if current chat
+      if (selectedUserRef.current?._id === otherUserId) {
         setMessages((prev) => [
           ...prev,
           {
-            _id: Date.now().toString(),
+            _id: data.messageId || Date.now().toString(),
             content: data.message,
             sender: { _id: data.senderId },
             receiver: { _id: data.receiverId },
@@ -143,39 +151,40 @@ function ChatPage() {
     return () => {
       socket.off("private_message", handleIncomingMessage);
     };
-  }, [socket]);
+  }, [socket, currentUser._id]);
 
+  // Send message handler
   const handleSendMessage = async (content) => {
     if (!selectedUser || !content.trim()) return;
     const tempId = Date.now().toString();
+
+    const newMessage = {
+      _id: tempId,
+      content,
+      sender: {
+        _id: currentUser._id,
+        username: currentUser.username,
+        avatar: currentUser.avatar,
+      },
+      receiver: {
+        _id: selectedUser._id,
+        username: selectedUser.username,
+        avatar: selectedUser.avatar,
+      },
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      isSending: true,
+      failed: false,
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+    sendMessage(selectedUser._id, content, tempId);
+
     try {
-      const newMessage = {
-        _id: tempId,
-        content,
-        sender: {
-          _id: currentUser._id,
-          username: currentUser.username,
-          avatar: currentUser.avatar,
-        },
-        receiver: {
-          _id: selectedUser._id,
-          username: selectedUser.username,
-          avatar: selectedUser.avatar,
-        },
-        createdAt: new Date().toISOString(),
-        isRead: false,
-        isSending: true,
-        failed: false,
-      };
-
-      setMessages((prev) => [...prev, newMessage]);
-      sendMessage(selectedUser._id, content, tempId);
-
       const res = await api.post("/messages", {
         receiverId: selectedUser._id,
         content,
       });
-
       setMessages((prev) =>
         prev.map((msg) =>
           msg._id === tempId
@@ -183,10 +192,9 @@ function ChatPage() {
             : msg
         )
       );
-
       updateConversationList(selectedUser._id, content);
-    } catch (error) {
-      console.error("Error sending message:", error);
+    } catch (err) {
+      console.error("Send message error:", err);
       setMessages((prev) =>
         prev.map((msg) =>
           msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg
@@ -198,27 +206,24 @@ function ChatPage() {
   const updateConversationList = (userId, content) => {
     const now = new Date().toISOString();
     setConversations((prevConversations) => {
-      const existingIndex = prevConversations.findIndex(
-        (c) => c.user._id === userId
-      );
-      if (existingIndex > -1) {
-        const updatedConversations = [...prevConversations];
-        updatedConversations[existingIndex] = {
-          ...updatedConversations[existingIndex],
+      const idx = prevConversations.findIndex((c) => c.user._id === userId);
+      if (idx !== -1) {
+        const updated = [...prevConversations];
+        updated[idx] = {
+          ...updated[idx],
           lastMessage: {
-            ...updatedConversations[existingIndex].lastMessage,
             content,
             createdAt: now,
             sender: currentUser._id,
           },
         };
-        const [updated] = updatedConversations.splice(existingIndex, 1);
-        updatedConversations.unshift(updated);
-        return updatedConversations;
+        const [conv] = updated.splice(idx, 1);
+        updated.unshift(conv);
+        return updated;
       } else {
         const user = users.find((u) => u._id === userId);
         if (user) {
-          const newConversation = {
+          const newConv = {
             _id: userId,
             user,
             lastMessage: {
@@ -228,7 +233,7 @@ function ChatPage() {
             },
             unreadCount: 0,
           };
-          return [newConversation, ...prevConversations];
+          return [newConv, ...prevConversations];
         }
         return prevConversations;
       }

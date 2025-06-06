@@ -85,6 +85,6 @@ userSchema.methods.toJSON = function () {
   return user;
 };
 
-const User = mongoose.model("Chat-User", userSchema);
+const User = mongoose.model("ChatUser", userSchema);
 
 export default User;
