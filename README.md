@@ -2,7 +2,7 @@
 
 A modern, feature-rich chat application built with React, Node.js, and MongoDB. ChitChat offers a seamless real-time messaging experience with a beautiful, responsive interface.
 
-![alt text](<project/src/assets/Screenshot 2025-06-05 144344.png>)
+![alt text](<frontend/src/assets/Screenshot 2025-06-05 144344.png>)
 
 ## ✨ Features
 
@@ -88,11 +88,11 @@ A modern, feature-rich chat application built with React, Node.js, and MongoDB. 
 
 ### Light Mode
 
-![alt text](<project/src/assets/Screenshot 2025-06-05 144523.png>)
+![alt text](<frontend/src/assets/Screenshot 2025-06-05 144523.png>)
 
 ### Dark Mode
 
-![alt text](<project/src/assets/Screenshot 2025-06-05 144344.png>)
+![alt text](<frontend/src/assets/Screenshot 2025-06-05 144344.png>)
 
 ## 🔒 Security
 
