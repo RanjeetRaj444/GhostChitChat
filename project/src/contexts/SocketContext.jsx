@@ -19,7 +19,7 @@ export function SocketProvider({ children }) {
   useEffect(() => {
     if (isAuthenticated && currentUser) {
       if (!socketRef.current) {
-        const newSocket = io("http://localhost:5000", {
+        const newSocket = io("https://ghostchitchat.onrender.com", {
           auth: {
             token: localStorage.getItem("token") || "", // or from cookies if needed
           },

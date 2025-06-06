@@ -16,7 +16,7 @@ export function AuthProvider({ children }) {
   // Memoize API instance
   const api = useMemo(() => {
     const instance = axios.create({
-      baseURL: "http://localhost:5000/api",
+      baseURL: "https://ghostchitchat.onrender.com/api",
       headers: {
         "Content-Type": "application/json",
       },
