@@ -32,7 +32,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "https://ghostchitchatapp.netlify.app",
+    origin: ["http://localhost:5173", "https://ghostchitchatapp.netlify.app"],
     credentials: true,
   },
 });
@@ -41,7 +41,7 @@ app.use(
   cors({
     origin: "*",
     credentials: true,
-  })
+  }),
 );
 app.use(express.json());
 

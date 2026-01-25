@@ -26,7 +26,7 @@ function Sidebar({
 
   // Filter conversations by search query
   const filteredConversations = conversations.filter((conv) =>
-    conv.user.username.toLowerCase().includes(searchQuery.toLowerCase())
+    conv.user.username.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   // Filter users by search query and exclude users already in conversations
@@ -34,7 +34,7 @@ function Sidebar({
   const filteredUsers = users.filter(
     (user) =>
       user.username.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !conversationUserIds.includes(user._id)
+      !conversationUserIds.includes(user._id),
   );
 
   // Format timestamp
@@ -56,7 +56,7 @@ function Sidebar({
   };
 
   return (
-    <div className="w-80 bg-white dark:bg-neutral-800 border-r border-neutral-200 dark:border-neutral-700 flex flex-col">
+    <div className="w-full md:w-80 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-md border-r border-neutral-200 dark:border-neutral-700 flex flex-col transition-all duration-300">
       {/* Header */}
       <div className="p-4 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
         <h1 className="text-xl font-bold text-primary-600 dark:text-primary-500">
@@ -95,82 +95,103 @@ function Sidebar({
       </div>
 
       {/* Search */}
-      <div className="p-4 border-b border-neutral-200 dark:border-neutral-700">
-        <div className="relative">
+      <div className="p-4">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <FaSearch className="h-4 w-4 text-neutral-400" />
+            <FaSearch className="h-4 w-4 text-neutral-400 group-focus-within:text-primary-500 transition-colors" />
           </div>
           <input
             type="text"
             placeholder="Search users..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input pl-10 py-1.5 text-sm"
+            className="w-full bg-neutral-100 dark:bg-neutral-700/50 border-transparent focus:border-primary-500 focus:bg-white dark:focus:bg-neutral-800 rounded-xl pl-10 py-2.5 text-sm transition-all duration-200 outline-none ring-2 ring-transparent focus:ring-primary-500/20"
           />
         </div>
       </div>
 
       {/* Chat List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
         {filteredConversations.length === 0 &&
           filteredUsers.length === 0 &&
           searchQuery && (
-            <div className="p-4 text-center text-neutral-500 dark:text-neutral-400">
-              No users found
+            <div className="p-8 text-center">
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                No users found
+              </p>
             </div>
           )}
 
         {filteredConversations.length > 0 && (
           <div className="pb-2">
-            <h2 className="px-4 pt-2 pb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-              Recent Chats
-            </h2>
+            {!searchQuery && (
+              <h2 className="px-3 pb-2 text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest font-mono">
+                Recent
+              </h2>
+            )}
 
-            <ul>
+            <ul className="space-y-1">
               {filteredConversations.map((conversation) => (
                 <li key={conversation._id}>
                   <button
                     onClick={() => onSelectUser(conversation.user)}
-                    className={`w-full flex items-center px-4 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors ${
+                    className={`w-full flex items-center px-3 py-2 rounded-xl transition-all duration-200 group ${
                       selectedUser && selectedUser._id === conversation.user._id
-                        ? "bg-neutral-100 dark:bg-neutral-700"
-                        : ""
+                        ? "bg-primary-50 dark:bg-primary-900/10 text-primary-900 dark:text-primary-100"
+                        : "hover:bg-neutral-100 dark:hover:bg-neutral-800/50 text-neutral-700 dark:text-neutral-200"
                     }`}
                   >
                     <div className="relative flex-shrink-0">
                       <img
-                        src={conversation.user.avatar}
+                        src={conversation.user.avatar || "/default-avatar.svg"}
                         alt={conversation.user.username}
-                        className="w-12 h-12 rounded-full object-cover"
+                        className={`w-10 h-10 rounded-full object-cover border-2 transition-colors ${
+                          selectedUser &&
+                          selectedUser._id === conversation.user._id
+                            ? "border-primary-200 dark:border-primary-700"
+                            : "border-transparent"
+                        }`}
                       />
                       {isUserOnline(conversation.user._id) && (
-                        <span className="online-indicator"></span>
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-success-500 border-2 border-white dark:border-neutral-800 rounded-full shadow-sm"></span>
                       )}
                     </div>
 
-                    <div className="ml-3 flex-1 overflow-hidden">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                    <div className="ml-3 flex-1 overflow-hidden text-left">
+                      <div className="flex justify-between items-baseline mb-0.5">
+                        <h3
+                          className={`text-sm font-semibold truncate ${
+                            conversation.unreadCount > 0
+                              ? "text-neutral-900 dark:text-white"
+                              : ""
+                          }`}
+                        >
                           {conversation.user.username}
                         </h3>
-                        <span className="text-xs text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
+                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-1 font-medium">
                           {formatTime(conversation.lastMessage.createdAt)}
                         </span>
                       </div>
 
-                      <div className="flex items-center">
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400 truncate">
+                      <div className="flex items-center justify-between">
+                        <p
+                          className={`text-xs truncate max-w-[85%] ${
+                            conversation.unreadCount > 0
+                              ? "text-neutral-800 dark:text-neutral-300 font-medium"
+                              : "text-neutral-500 dark:text-neutral-500"
+                          }`}
+                        >
                           {conversation.lastMessage.sender ===
                           currentUser._id ? (
-                            <span className="text-neutral-400 dark:text-neutral-500">
-                              You:{" "}
+                            <span className="text-neutral-400 dark:text-neutral-600 mr-1">
+                              You:
                             </span>
                           ) : null}
                           {conversation.lastMessage.content}
                         </p>
 
                         {conversation.unreadCount > 0 && (
-                          <span className="ml-2 flex-shrink-0 inline-block bg-primary-600 text-white text-xs font-medium rounded-full h-5 min-w-5 flex items-center justify-center px-1">
+                          <span className="flex-shrink-0 bg-primary-500 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] flex items-center justify-center px-1 shadow-sm shadow-primary-500/20">
                             {conversation.unreadCount}
                           </span>
                         )}
@@ -185,44 +206,40 @@ function Sidebar({
 
         {/* New Chat Section */}
         {(showAllUsers || searchQuery) && filteredUsers.length > 0 && (
-          <div className="pb-2">
-            <h2 className="px-4 pt-2 pb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider flex justify-between items-center">
-              <span>New Chat</span>
-              {!searchQuery && (
-                <button
-                  onClick={() => setShowAllUsers(false)}
-                  className="text-primary-600 dark:text-primary-500 text-xs"
-                >
-                  Hide
-                </button>
-              )}
+          <div className="pb-2 animate-fade-in">
+            <h2 className="px-3 pt-4 pb-2 text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest font-mono">
+              {searchQuery ? "Contacts" : "Suggested"}
             </h2>
 
-            <ul>
+            <ul className="space-y-1">
               {filteredUsers.map((user) => (
                 <li key={user._id}>
                   <button
                     onClick={() => onSelectUser(user)}
-                    className="w-full flex items-center px-4 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                    className="w-full flex items-center px-3 py-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800/50 transition-all duration-200 text-neutral-700 dark:text-neutral-200 group"
                   >
                     <div className="relative flex-shrink-0">
                       <img
-                        src={user.avatar}
+                        src={user.avatar || "/default-avatar.svg"}
                         alt={user.username}
-                        className="w-12 h-12 rounded-full object-cover"
+                        className="w-10 h-10 rounded-full object-cover border-2 border-transparent group-hover:border-neutral-200 dark:group-hover:border-neutral-700 transition-colors"
                       />
                       {isUserOnline(user._id) && (
-                        <span className="online-indicator"></span>
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-success-500 border-2 border-white dark:border-neutral-800 rounded-full shadow-sm"></span>
                       )}
                     </div>
 
-                    <div className="ml-3 flex-1">
-                      <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    <div className="ml-3 flex-1 text-left">
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                         {user.username}
                       </h3>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                        {isUserOnline(user._id) ? "Online" : "Offline"}
+                      <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                        Click to start chatting
                       </p>
+                    </div>
+
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-primary-500">
+                      <FaPlus className="w-3 h-3" />
                     </div>
                   </button>
                 </li>
@@ -234,10 +251,12 @@ function Sidebar({
         {!showAllUsers && !searchQuery && filteredUsers.length > 0 && (
           <button
             onClick={() => setShowAllUsers(true)}
-            className="w-full flex items-center justify-center px-4 py-3 text-primary-600 dark:text-primary-500 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+            className="w-full flex items-center justify-center px-4 py-3 mt-2 text-sm font-medium text-primary-600 dark:text-primary-500/80 hover:text-primary-700 dark:hover:text-primary-400 bg-primary-50 dark:bg-primary-500/10 hover:bg-primary-100 dark:hover:bg-primary-500/20 rounded-xl transition-all duration-200 border border-transparent hover:border-primary-200 dark:hover:border-primary-500/20 group"
           >
-            <FaPlus className="w-4 h-4 mr-2" />
-            <span>New Chat</span>
+            <span className="group-hover:scale-110 transition-transform duration-200 mr-2">
+              <FaPlus className="w-3 h-3" />
+            </span>
+            <span>Start New Chat</span>
           </button>
         )}
       </div>
@@ -245,7 +264,7 @@ function Sidebar({
       {/* User Profile */}
       <div className="p-4 border-t border-neutral-200 dark:border-neutral-700 flex items-center">
         <img
-          src={currentUser?.avatar}
+          src={currentUser?.avatar || "/default-avatar.svg"}
           alt={currentUser?.username}
           className="w-10 h-10 rounded-full object-cover"
         />

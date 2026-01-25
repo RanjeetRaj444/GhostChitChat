@@ -15,7 +15,7 @@ function ChatHeader({ user, isOnline, isTyping, onBack }) {
 
       <div className="relative flex-shrink-0">
         <img
-          src={user.avatar || "/default-avatar.png"}
+          src={user.avatar || "/default-avatar.svg"}
           alt={user.username || "User"}
           className="w-10 h-10 rounded-full object-cover"
         />

@@ -6,24 +6,29 @@
   html {
     @apply antialiased;
   }
-  
+
   body {
     @apply bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-100 transition-colors duration-200;
+    min-height: 100dvh;
   }
-  
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     @apply w-2;
   }
-  
+
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
-  
+
   ::-webkit-scrollbar-thumb {
     @apply bg-neutral-300 dark:bg-neutral-700 rounded-full;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-neutral-400 dark:bg-neutral-600;
   }
@@ -33,49 +38,49 @@
   .btn {
     @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
   }
-  
+
   .btn-primary {
     @apply bg-primary-600 hover:bg-primary-700 text-white focus:ring-primary-500;
   }
-  
+
   .btn-secondary {
     @apply bg-secondary-600 hover:bg-secondary-700 text-white focus:ring-secondary-500;
   }
-  
+
   .btn-outline {
     @apply border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:ring-neutral-500;
   }
-  
+
   .input {
     @apply w-full px-4 py-2 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg 
     focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-600 focus:border-transparent
     transition-all duration-200;
   }
-  
+
   .form-label {
     @apply block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1;
   }
-  
+
   .message-bubble {
     @apply max-w-xs sm:max-w-md md:max-w-lg px-4 py-2 rounded-2xl mb-1;
   }
-  
+
   .message-sent {
     @apply bg-primary-600 text-white rounded-tr-none ml-auto;
   }
-  
+
   .message-received {
     @apply bg-neutral-200 dark:bg-neutral-800 rounded-tl-none;
   }
-  
+
   .typing-indicator {
     @apply flex space-x-1 px-3 py-2 bg-neutral-200 dark:bg-neutral-800 rounded-full w-16 h-8 items-center;
   }
-  
+
   .typing-dot {
     @apply w-2 h-2 bg-neutral-500 dark:bg-neutral-400 rounded-full animate-pulse;
   }
-  
+
   .online-indicator {
     @apply absolute bottom-0 right-0 w-3 h-3 bg-success-500 border-2 border-white dark:border-neutral-800 rounded-full;
   }

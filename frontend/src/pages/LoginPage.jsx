@@ -4,6 +4,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { FaMoon, FaSun, FaEnvelope, FaLock } from "react-icons/fa";
 
+import toast from "react-hot-toast";
+
 function LoginPage() {
   const [formData, setFormData] = useState({
     email: "",
@@ -30,12 +32,16 @@ function LoginPage() {
       const result = await login(formData);
 
       if (result.success) {
+        toast.success("Welcome back!");
         navigate("/");
       } else {
         setError(result.error);
+        toast.error(result.error);
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
+      const msg = "An unexpected error occurred. Please try again.";
+      setError(msg);
+      toast.error(msg);
       console.error("Login error:", err);
     } finally {
       setLoading(false);
@@ -43,7 +49,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-neutral-50 dark:bg-neutral-900 px-4 sm:px-6 lg:px-8">
       <button
         onClick={toggleTheme}
         className="absolute top-4 right-4 p-2 rounded-full bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors"

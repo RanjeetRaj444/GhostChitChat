@@ -9,7 +9,7 @@ export function useSocket() {
 }
 
 export function SocketProvider({ children }) {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { currentUser, isAuthenticated, token } = useAuth();
   const socketRef = useRef(null);
   const [socket, setSocket] = useState(null); // keep socket in state to trigger rerenders
 
@@ -17,11 +17,11 @@ export function SocketProvider({ children }) {
   const [typingUsers, setTypingUsers] = useState({});
 
   useEffect(() => {
-    if (isAuthenticated && currentUser) {
+    if (isAuthenticated && currentUser && token) {
       if (!socketRef.current) {
-        const newSocket = io("https://ghostchitchat.onrender.com", {
+        const newSocket = io(import.meta.env.VITE_API_URL, {
           auth: {
-            token: localStorage.getItem("token") || "", // or from cookies if needed
+            token: token,
           },
           reconnectionAttempts: 5,
         });
@@ -40,7 +40,7 @@ export function SocketProvider({ children }) {
           setOnlineUsers((prev) =>
             status === "online"
               ? [...new Set([...prev, userId])]
-              : prev.filter((id) => id !== userId)
+              : prev.filter((id) => id !== userId),
           );
         });
 
@@ -67,7 +67,7 @@ export function SocketProvider({ children }) {
         setTypingUsers({});
       }
     };
-  }, [isAuthenticated, currentUser?._id]);
+  }, [isAuthenticated, currentUser?._id, token]);
 
   const sendTypingStatus = (receiverId, isTyping) => {
     if (socketRef.current && currentUser) {
@@ -87,6 +87,19 @@ export function SocketProvider({ children }) {
         message,
         messageId,
         timestamp: new Date().toISOString(),
+        senderProfile: {
+          username: currentUser.username,
+          avatar: currentUser.avatar,
+        },
+      });
+    }
+  };
+
+  const markRead = (senderId) => {
+    if (socketRef.current && currentUser) {
+      socketRef.current.emit("mark_read", {
+        senderId, // The person who sent the messages we are reading
+        receiverId: currentUser._id, // Us
       });
     }
   };
@@ -97,6 +110,7 @@ export function SocketProvider({ children }) {
     typingUsers,
     sendTypingStatus,
     sendMessage,
+    markRead,
     isUserOnline: (userId) => onlineUsers.includes(userId),
     isUserTyping: (userId) => !!typingUsers[userId],
   };

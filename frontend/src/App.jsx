@@ -35,12 +35,15 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+import { Toaster } from "react-hot-toast";
+
 function App() {
   return (
     <Router>
       <AuthProvider>
         <ThemeProvider>
           <SocketProvider>
+            <Toaster position="top-right" />
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />

@@ -1,20 +1,20 @@
-import { useEffect, useRef, useMemo } from 'react';
-import { format } from 'date-fns';
+import { useEffect, useRef, useMemo } from "react";
+import { format } from "date-fns";
 
 function ChatWindow({ messages, currentUser, selectedUser, loading }) {
   const endRef = useRef(null);
 
   useEffect(() => {
     if (endRef.current) {
-      endRef.current.scrollIntoView({ behavior: 'smooth' });
+      endRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
   const formatMessageTime = (timestamp) => {
     try {
-      return format(new Date(timestamp), 'h:mm a');
+      return format(new Date(timestamp), "h:mm a");
     } catch (error) {
-      return '';
+      return "";
     }
   };
 
@@ -40,11 +40,11 @@ function ChatWindow({ messages, currentUser, selectedUser, loading }) {
     yesterday.setDate(today.getDate() - 1);
 
     if (messageDate.toDateString() === today.toDateString()) {
-      return 'Today';
+      return "Today";
     } else if (messageDate.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
+      return "Yesterday";
     } else {
-      return format(messageDate, 'MMMM d, yyyy');
+      return format(messageDate, "MMMM d, yyyy");
     }
   };
 
@@ -79,19 +79,21 @@ function ChatWindow({ messages, currentUser, selectedUser, loading }) {
 
               {messages.map((message) => {
                 const isSentByCurrentUser =
-                  message.sender && currentUser && message.sender._id === currentUser._id;
+                  message.sender &&
+                  currentUser &&
+                  message.sender._id === currentUser._id;
 
                 return (
                   <div
                     key={message._id}
                     className={`flex ${
-                      isSentByCurrentUser ? 'justify-end' : 'justify-start'
+                      isSentByCurrentUser ? "justify-end" : "justify-start"
                     } mb-4 animate-fade-in`}
                   >
                     {!isSentByCurrentUser && (
                       <img
-                        src={selectedUser?.avatar || '/default-avatar.png'}
-                        alt={selectedUser?.username || 'User'}
+                        src={selectedUser?.avatar || "/default-avatar.svg"}
+                        alt={selectedUser?.username || "User"}
                         className="w-8 h-8 rounded-full mr-2 self-end"
                       />
                     )}
@@ -100,8 +102,8 @@ function ChatWindow({ messages, currentUser, selectedUser, loading }) {
                       <div
                         className={`message-bubble ${
                           isSentByCurrentUser
-                            ? 'message-sent'
-                            : 'message-received'
+                            ? "message-sent"
+                            : "message-received"
                         }`}
                       >
                         {message.content}
@@ -110,8 +112,8 @@ function ChatWindow({ messages, currentUser, selectedUser, loading }) {
                       <div
                         className={`flex items-center text-xs mt-1 ${
                           isSentByCurrentUser
-                            ? 'justify-end mr-1'
-                            : 'justify-start ml-1'
+                            ? "justify-end mr-1"
+                            : "justify-start ml-1"
                         }`}
                       >
                         <span className="text-neutral-500 dark:text-neutral-400">
@@ -119,9 +121,13 @@ function ChatWindow({ messages, currentUser, selectedUser, loading }) {
                         </span>
 
                         {isSentByCurrentUser && (
-                          <span className="ml-1">
+                          <span className="ml-1 h-3 flex items-center">
                             {message.isSending ? (
-                              <svg className="w-3 h-3 text-neutral-400" viewBox="0 0 24 24">
+                              <svg
+                                className="w-3 h-3 text-neutral-400 animate-spin"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
                                 <circle
                                   className="opacity-25"
                                   cx="12"
@@ -137,16 +143,22 @@ function ChatWindow({ messages, currentUser, selectedUser, loading }) {
                                 ></path>
                               </svg>
                             ) : message.failed ? (
-                              <span className="text-error-500">!</span>
-                            ) : message.isRead ? (
-                              <svg className="w-3 h-3 text-primary-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                <path d="M5 13l4 4L19 7"></path>
-                                <path d="M9 17l4-4"></path>
-                              </svg>
+                              <span className="text-error-500 font-bold">
+                                !
+                              </span>
                             ) : (
-                              <svg className="w-3 h-3 text-neutral-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                <path d="M5 13l4 4L19 7"></path>
-                              </svg>
+                              <div className="flex -space-x-1 items-end">
+                                <span
+                                  className={`text-[10px] font-bold ${message.isRead ? "text-success-500" : "text-neutral-400"}`}
+                                >
+                                  ✓
+                                </span>
+                                <span
+                                  className={`text-[10px] font-bold ${message.isRead ? "text-success-500" : "hidden"}`}
+                                >
+                                  ✓
+                                </span>
+                              </div>
                             )}
                           </span>
                         )}
@@ -155,8 +167,8 @@ function ChatWindow({ messages, currentUser, selectedUser, loading }) {
 
                     {isSentByCurrentUser && (
                       <img
-                        src={currentUser?.avatar || '/default-avatar.png'}
-                        alt={currentUser?.username || 'Me'}
+                        src={currentUser?.avatar || "/default-avatar.svg"}
+                        alt={currentUser?.username || "Me"}
                         className="w-8 h-8 rounded-full ml-2 self-end"
                       />
                     )}

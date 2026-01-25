@@ -8,6 +8,8 @@ import ChatWindow from "../components/ChatWindow";
 import ChatInput from "../components/ChatInput";
 import UserProfileModal from "../components/UserProfileModal";
 
+import toast from "react-hot-toast";
+
 function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [users, setUsers] = useState([]);
@@ -80,13 +82,14 @@ function ChatPage() {
       try {
         const res = await api.get(`/messages/${selectedUser._id}`);
         setMessages(res.data);
-        await api.put(`/messages/read/${selectedUser._id}`); // mark read
+        await api.put(`/messages/read/${selectedUser._id}`); // mark read in DB
+        markRead(selectedUser._id); // mark read in Realtime
         setConversations((prev) =>
           prev.map((conv) =>
             conv.user._id === selectedUser._id
               ? { ...conv, unreadCount: 0 }
-              : conv
-          )
+              : conv,
+          ),
         );
       } catch (err) {
         console.error("Failed to fetch messages:", err);
@@ -108,18 +111,36 @@ function ChatPage() {
 
       setConversations((prev) => {
         let idx = prev.findIndex((c) => c.user._id === otherUserId);
-        if (idx === -1) return prev;
+
+        const newMsgForConv = {
+          content: data.message,
+          createdAt: data.timestamp,
+          sender: data.senderId,
+        };
+
+        if (idx === -1) {
+          // New conversation!
+          if (!data.senderProfile) return prev; // Safety check
+
+          const newConv = {
+            _id: otherUserId, // Using user ID as conversation ID for safety
+            user: {
+              _id: otherUserId,
+              username: data.senderProfile.username,
+              avatar: data.senderProfile.avatar,
+            },
+            lastMessage: newMsgForConv,
+            unreadCount: 1,
+          };
+          return [newConv, ...prev];
+        }
 
         const updated = [...prev];
         const isSelectedUser = selectedUserRef.current?._id === otherUserId;
 
         updated[idx] = {
           ...updated[idx],
-          lastMessage: {
-            content: data.message,
-            createdAt: data.timestamp,
-            sender: data.senderId,
-          },
+          lastMessage: newMsgForConv,
           unreadCount: isSelectedUser ? 0 : (updated[idx].unreadCount || 0) + 1,
         };
 
@@ -131,25 +152,59 @@ function ChatPage() {
 
       // Add message to messages if current chat
       if (selectedUserRef.current?._id === otherUserId) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            _id: data.messageId || Date.now().toString(),
-            content: data.message,
-            sender: { _id: data.senderId },
-            receiver: { _id: data.receiverId },
-            createdAt: data.timestamp,
-            isRead: false,
-            failed: false,
-            isSending: false,
-          },
-        ]);
+        setMessages((prev) => {
+          // Prevent duplicates
+          if (prev.some((m) => m._id === data.messageId)) return prev;
+
+          return [
+            ...prev,
+            {
+              _id: data.messageId || Date.now().toString(),
+              content: data.message,
+              sender: {
+                _id: data.senderId,
+                username: data.senderProfile?.username,
+                avatar: data.senderProfile?.avatar,
+              },
+              receiver: { _id: data.receiverId }, // Context: current user is receiver
+              createdAt: data.timestamp,
+              isRead: false,
+              failed: false,
+              isSending: false,
+            },
+          ];
+        });
+
+        // Critical Fix: Immediately mark the new incoming message as read if we are looking at it
+        markRead(data.senderId);
       }
     };
 
     socket.on("private_message", handleIncomingMessage);
+
+    // Listen for read receipts (Real-time Double Ticks)
+    socket.on("messages_read_update", ({ by, readAt }) => {
+      console.log(`[Client] Received read receipt from: ${by}`);
+
+      // Update the messages state locally to show double ticks
+      setMessages((prev) =>
+        prev.map((msg) => {
+          // If the message is in the current chat, and I sent it, and the other person ('by') read it
+          const isMyMessage =
+            msg.sender === currentUser._id ||
+            msg.sender?._id === currentUser._id;
+
+          if (isMyMessage && selectedUserRef.current?._id === by) {
+            return { ...msg, isRead: true };
+          }
+          return msg;
+        }),
+      );
+    });
+
     return () => {
       socket.off("private_message", handleIncomingMessage);
+      socket.off("messages_read_update");
     };
   }, [socket, currentUser._id]);
 
@@ -164,12 +219,12 @@ function ChatPage() {
       sender: {
         _id: currentUser._id,
         username: currentUser.username,
-        avatar: currentUser.avatar,
+        avatar: currentUser.avatar || "/default-avatar.svg",
       },
       receiver: {
         _id: selectedUser._id,
         username: selectedUser.username,
-        avatar: selectedUser.avatar,
+        avatar: selectedUser.avatar || "/default-avatar.svg",
       },
       createdAt: new Date().toISOString(),
       isRead: false,
@@ -187,18 +242,25 @@ function ChatPage() {
       });
       setMessages((prev) =>
         prev.map((msg) =>
-          msg._id === tempId
-            ? { ...res.data, isSending: false, failed: false }
-            : msg
-        )
+          // Robust ID matching: Match tempId OR if we unknowingly added it via socket already
+          msg._id === tempId ||
+          (msg.content === content && msg.createdAt === newMessage.createdAt)
+            ? {
+                ...res.data,
+                isSending: false,
+                failed: false,
+                isRead: msg.isRead || res.data.isRead,
+              }
+            : msg,
+        ),
       );
       updateConversationList(selectedUser._id, content);
     } catch (err) {
       console.error("Send message error:", err);
       setMessages((prev) =>
         prev.map((msg) =>
-          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg
-        )
+          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg,
+        ),
       );
     }
   };
@@ -250,23 +312,32 @@ function ChatPage() {
     }
   };
 
-  return (
-    <div className="h-screen flex flex-col bg-neutral-50 dark:bg-neutral-900 overflow-hidden">
-      <div className="flex h-full">
-        <Sidebar
-          conversations={conversations}
-          users={users}
-          selectedUser={selectedUser}
-          onSelectUser={handleSelectUser}
-          onLogout={logout}
-          onOpenProfile={() => setShowProfileModal(true)}
-          currentUser={currentUser}
-          isUserOnline={isUserOnline}
-          darkMode={darkMode}
-          toggleTheme={toggleTheme}
-        />
+  const handleLogout = () => {
+    logout();
+    toast.success("Logged out successfully");
+  };
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+  return (
+    <div className="h-[100dvh] flex flex-col bg-neutral-50 dark:bg-neutral-900 overflow-hidden">
+      <div className="flex h-full relative">
+        <div className={`${selectedUser ? "hidden md:flex" : "flex"} h-full`}>
+          <Sidebar
+            conversations={conversations}
+            users={users}
+            selectedUser={selectedUser}
+            onSelectUser={handleSelectUser}
+            onLogout={handleLogout}
+            onOpenProfile={() => setShowProfileModal(true)}
+            currentUser={currentUser}
+            isUserOnline={isUserOnline}
+            darkMode={darkMode}
+            toggleTheme={toggleTheme}
+          />
+        </div>
+
+        <div
+          className={`flex-1 flex flex-col overflow-hidden ${selectedUser ? "flex" : "hidden md:flex"}`}
+        >
           {selectedUser ? (
             <>
               <ChatHeader
@@ -289,27 +360,51 @@ function ChatPage() {
               />
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-              <div className="bg-white dark:bg-neutral-800 p-8 rounded-xl shadow-chat dark:shadow-chat-dark max-w-md animate-fade-in">
-                <h2 className="text-2xl font-semibold text-neutral-800 dark:text-neutral-200 mb-4">
-                  Welcome to ChitChat!
-                </h2>
-                <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-                  Select a conversation from the sidebar or start a new chat to
-                  begin messaging.
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-neutral-50/50 dark:bg-neutral-900/50">
+              {/* Decorative Background Elements */}
+              <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary-500/10 rounded-full blur-3xl rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
+                <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-secondary-500/10 rounded-full blur-3xl rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
+                <div className="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-accent-500/10 rounded-full blur-3xl rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000"></div>
+              </div>
+
+              <div className="relative z-10 max-w-2xl px-6">
+                <div className="mb-8 flex justify-center">
+                  <div className="bg-white dark:bg-neutral-800 p-6 rounded-2xl shadow-xl shadow-primary-500/10 ring-1 ring-black/5 dark:ring-white/10 animate-fade-in">
+                    <img
+                      src="/vite.svg"
+                      alt="Logo"
+                      className="w-20 h-20 opacity-80"
+                    />
+                  </div>
+                </div>
+
+                <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-white mb-6 tracking-tight">
+                  Welcome to{" "}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-400 dark:to-secondary-400">
+                    ChitChat
+                  </span>
+                </h1>
+
+                <p className="text-xl text-neutral-600 dark:text-neutral-300 mb-10 max-w-lg mx-auto leading-relaxed">
+                  Connect freely, chat securely. Select a conversation from the
+                  sidebar to start talking, or invite someone new.
                 </p>
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => {
-                      if (users.length > 0) {
-                        handleSelectUser(users[0]);
-                      }
-                    }}
-                    className="btn btn-primary"
-                    disabled={users.length === 0}
-                  >
-                    Start a New Chat
-                  </button>
+
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  {!conversations.length && (
+                    <button
+                      onClick={() => {
+                        if (users.length > 0) {
+                          handleSelectUser(users[0]);
+                        }
+                      }}
+                      className="btn btn-primary px-8 py-3 rounded-full text-lg shadow-lg shadow-primary-600/30 hover:shadow-primary-600/50 hover:-translate-y-0.5 transition-all duration-300"
+                      disabled={users.length === 0}
+                    >
+                      Start Messaging
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

@@ -4,11 +4,13 @@ const connectedUsers = new Map();
 // Maps `${senderId}-${receiverId}` => true (typing status)
 const typingUsers = new Map();
 
-export const socketHandler = (io) => {
-  io.on('connection', (socket) => {
-    console.log('New client connected', socket.id);
+import Message from "./models/Message.js";
 
-    socket.on('user_login', (userId) => {
+export const socketHandler = (io) => {
+  io.on("connection", (socket) => {
+    console.log("New client connected", socket.id);
+
+    socket.on("user_login", (userId) => {
       if (!connectedUsers.has(userId)) {
         connectedUsers.set(userId, new Set());
       }
@@ -17,13 +19,13 @@ export const socketHandler = (io) => {
       console.log(`User ${userId} connected on socket ${socket.id}`);
 
       // Broadcast online status
-      io.emit('user_status', { userId, status: 'online' });
+      io.emit("user_status", { userId, status: "online" });
 
       // Send online users list to this socket
-      socket.emit('online_users', [...connectedUsers.keys()]);
+      socket.emit("online_users", [...connectedUsers.keys()]);
     });
 
-    socket.on('private_message', (data) => {
+    socket.on("private_message", (data) => {
       const { receiverId, message, senderId, timestamp } = data;
       const receiverSockets = connectedUsers.get(receiverId);
 
@@ -32,28 +34,35 @@ export const socketHandler = (io) => {
       if (typingUsers.has(typingKey)) {
         typingUsers.delete(typingKey);
         if (receiverSockets) {
-          receiverSockets.forEach(sockId =>
-            io.to(sockId).emit('typing_status', { userId: senderId, isTyping: false })
+          receiverSockets.forEach((sockId) =>
+            io
+              .to(sockId)
+              .emit("typing_status", { userId: senderId, isTyping: false }),
           );
         }
       }
 
       // Send message to receiver if online
       if (receiverSockets) {
-        receiverSockets.forEach(sockId =>
-          io.to(sockId).emit('private_message', { senderId, message, timestamp })
+        receiverSockets.forEach((sockId) =>
+          io.to(sockId).emit("private_message", {
+            senderId,
+            message,
+            timestamp,
+            senderProfile: data.senderProfile,
+          }),
         );
       }
 
       // Confirm delivery to sender
-      socket.emit('message_delivered', {
+      socket.emit("message_delivered", {
         messageId: data.messageId,
         receiverId,
-        delivered: !!receiverSockets
+        delivered: !!receiverSockets,
       });
     });
 
-    socket.on('typing', (data) => {
+    socket.on("typing", (data) => {
       const { senderId, receiverId, isTyping } = data;
       const typingKey = `${senderId}-${receiverId}`;
 
@@ -65,14 +74,30 @@ export const socketHandler = (io) => {
 
       const receiverSockets = connectedUsers.get(receiverId);
       if (receiverSockets) {
-        receiverSockets.forEach(sockId =>
-          io.to(sockId).emit('typing_status', { userId: senderId, isTyping })
+        receiverSockets.forEach((sockId) =>
+          io.to(sockId).emit("typing_status", { userId: senderId, isTyping }),
         );
       }
     });
 
-    socket.on('disconnect', () => {
-      console.log('Client disconnected', socket.id);
+    socket.on("mark_read", (data) => {
+      const { senderId, receiverId } = data;
+      // senderId is the person who SENT the messages (User B)
+      // receiverId is the person READING them (User A, current socket)
+
+      const senderSockets = connectedUsers.get(senderId);
+      if (senderSockets) {
+        senderSockets.forEach((sockId) =>
+          io.to(sockId).emit("messages_read_update", {
+            by: receiverId,
+            readAt: new Date().toISOString(),
+          }),
+        );
+      }
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Client disconnected", socket.id);
 
       for (const [userId, sockets] of connectedUsers.entries()) {
         if (sockets.has(socket.id)) {
@@ -80,16 +105,18 @@ export const socketHandler = (io) => {
           if (sockets.size === 0) {
             connectedUsers.delete(userId);
             console.log(`User ${userId} went offline`);
-            io.emit('user_status', { userId, status: 'offline' });
+            io.emit("user_status", { userId, status: "offline" });
 
             // Clear typing indicators for this user
             for (const key of typingUsers.keys()) {
               if (key.startsWith(`${userId}-`)) {
-                const receiverId = key.split('-')[1];
+                const receiverId = key.split("-")[1];
                 const receiverSockets = connectedUsers.get(receiverId);
                 if (receiverSockets) {
-                  receiverSockets.forEach(sockId =>
-                    io.to(sockId).emit('typing_status', { userId, isTyping: false })
+                  receiverSockets.forEach((sockId) =>
+                    io
+                      .to(sockId)
+                      .emit("typing_status", { userId, isTyping: false }),
                   );
                 }
                 typingUsers.delete(key);
