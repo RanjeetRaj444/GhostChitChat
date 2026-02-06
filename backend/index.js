@@ -11,6 +11,7 @@ import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import messageRoutes from "./routes/messages.js";
 import { socketHandler } from "./socketHandler.js";
+import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
 dotenv.config();
 
@@ -48,6 +49,9 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 socketHandler(io);
 
