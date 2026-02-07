@@ -9,6 +9,8 @@ export const useChat = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [replyTo, setReplyTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
 
   const { socket, markRead, sendMessage: sendSocketMessage } = useSocket();
   const { api, currentUser } = useAuth();
@@ -59,6 +61,9 @@ export const useChat = () => {
     if (selectedUser) {
       localStorage.setItem("selectedUserId", selectedUser._id);
       fetchMessages(selectedUser._id);
+      // Clear reply/edit state when switching conversations
+      setReplyTo(null);
+      setEditingMessage(null);
     } else {
       localStorage.removeItem("selectedUserId");
       setMessages([]);
@@ -141,6 +146,8 @@ export const useChat = () => {
               content: data.message || "",
               messageType: data.messageType || "text",
               imageUrl: data.imageUrl || null,
+              replyTo: data.replyTo || null,
+              reactions: [],
               sender: {
                 _id: data.senderId,
                 username: data.senderProfile?.username,
@@ -171,16 +178,88 @@ export const useChat = () => {
       }
     };
 
+    // Handle reaction updates
+    const handleReactionUpdate = (data) => {
+      const { messageId, emoji, userId, username, action } = data;
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg._id !== messageId) return msg;
+          let reactions = [...(msg.reactions || [])];
+
+          if (action === "remove") {
+            reactions = reactions.filter(
+              (r) => !(r.user?._id === userId || r.user === userId),
+            );
+          } else {
+            const existingIdx = reactions.findIndex(
+              (r) => r.user?._id === userId || r.user === userId,
+            );
+            if (existingIdx > -1) {
+              reactions[existingIdx] = {
+                ...reactions[existingIdx],
+                emoji,
+              };
+            } else {
+              reactions.push({
+                user: { _id: userId, username },
+                emoji,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          }
+
+          return { ...msg, reactions };
+        }),
+      );
+    };
+
+    // Handle delete updates
+    const handleDeleteUpdate = (data) => {
+      const { messageId, deleteType } = data;
+      if (deleteType === "everyone") {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === messageId
+              ? {
+                  ...msg,
+                  deletedForEveryone: true,
+                  content: "",
+                  imageUrl: null,
+                }
+              : msg,
+          ),
+        );
+      }
+    };
+
+    // Handle edit updates
+    const handleEditUpdate = (data) => {
+      const { messageId, content, editedAt } = data;
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, content, isEdited: true, editedAt }
+            : msg,
+        ),
+      );
+    };
+
     socket.on("private_message", handleIncomingMessage);
     socket.on("messages_read_update", handleReadUpdate);
+    socket.on("message_reaction_update", handleReactionUpdate);
+    socket.on("message_deleted_update", handleDeleteUpdate);
+    socket.on("message_edited_update", handleEditUpdate);
 
     return () => {
       socket.off("private_message", handleIncomingMessage);
       socket.off("messages_read_update", handleReadUpdate);
+      socket.off("message_reaction_update", handleReactionUpdate);
+      socket.off("message_deleted_update", handleDeleteUpdate);
+      socket.off("message_edited_update", handleEditUpdate);
     };
   }, [socket, currentUser._id, markRead]);
 
-  const sendMessage = async (content) => {
+  const sendMessage = async (content, replyToId = null) => {
     if (!selectedUser || !content.trim()) return;
     const tempId = Date.now().toString();
 
@@ -188,6 +267,8 @@ export const useChat = () => {
       _id: tempId,
       content,
       messageType: "text",
+      replyTo: replyTo || null,
+      reactions: [],
       sender: {
         _id: currentUser._id,
         username: currentUser.username,
@@ -205,12 +286,13 @@ export const useChat = () => {
     };
 
     setMessages((prev) => [...prev, newMessage]);
-    sendSocketMessage(selectedUser._id, content, tempId);
+    setReplyTo(null);
 
     try {
       const res = await api.post("/messages", {
         receiverId: selectedUser._id,
         content,
+        replyToId: replyToId || replyTo?._id,
       });
 
       setMessages((prev) =>
@@ -221,6 +303,9 @@ export const useChat = () => {
             : msg,
         ),
       );
+
+      // Send socket message
+      sendSocketMessage(selectedUser._id, content, res.data._id);
       updateConversationList(selectedUser._id, content);
     } catch (err) {
       console.error("Send message error:", err);
@@ -234,11 +319,10 @@ export const useChat = () => {
   };
 
   // Send image message
-  const sendImage = async (imageFile) => {
+  const sendImage = async (imageFile, replyToId = null) => {
     if (!selectedUser || !imageFile) return;
     const tempId = Date.now().toString();
 
-    // Create a local URL for preview
     const localImageUrl = URL.createObjectURL(imageFile);
 
     const newMessage = {
@@ -246,6 +330,8 @@ export const useChat = () => {
       content: "",
       messageType: "image",
       imageUrl: localImageUrl,
+      replyTo: replyTo || null,
+      reactions: [],
       sender: {
         _id: currentUser._id,
         username: currentUser.username,
@@ -263,11 +349,15 @@ export const useChat = () => {
     };
 
     setMessages((prev) => [...prev, newMessage]);
+    setReplyTo(null);
 
     try {
       const formData = new FormData();
       formData.append("image", imageFile);
       formData.append("receiverId", selectedUser._id);
+      if (replyToId || replyTo?._id) {
+        formData.append("replyToId", replyToId || replyTo._id);
+      }
 
       const res = await api.post("/messages/image", formData, {
         headers: {
@@ -275,7 +365,6 @@ export const useChat = () => {
         },
       });
 
-      // Clean up local URL
       URL.revokeObjectURL(localImageUrl);
 
       setMessages((prev) =>
@@ -286,10 +375,7 @@ export const useChat = () => {
         ),
       );
 
-      // Update conversation list with image indicator
       updateConversationList(selectedUser._id, "📷 Image");
-
-      // Send socket notification to receiver
       sendSocketMessage(selectedUser._id, "📷 Image", res.data._id);
     } catch (err) {
       console.error("Send image error:", err);
@@ -300,6 +386,125 @@ export const useChat = () => {
         ),
       );
       toast.error("Failed to send image");
+    }
+  };
+
+  // React to a message
+  const reactToMessage = async (messageId, emoji) => {
+    if (!selectedUser) return;
+
+    // Check if user already has this reaction (for determining socket action)
+    const message = messages.find((m) => m._id === messageId);
+    const existingReaction = message?.reactions?.find(
+      (r) =>
+        (r.user?._id === currentUser._id || r.user === currentUser._id) &&
+        r.emoji === emoji,
+    );
+    const action = existingReaction ? "remove" : "add";
+
+    try {
+      const res = await api.post(`/messages/${messageId}/react`, { emoji });
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, reactions: res.data.reactions }
+            : msg,
+        ),
+      );
+
+      // Emit socket event for real-time update
+      socket?.emit("message_reaction", {
+        messageId,
+        emoji,
+        userId: currentUser._id,
+        receiverId: selectedUser._id,
+        username: currentUser.username,
+        action,
+      });
+    } catch (err) {
+      console.error("React to message error:", err);
+      toast.error("Failed to react");
+    }
+  };
+
+  // Delete message for me
+  const deleteForMe = async (messageId) => {
+    try {
+      await api.delete(`/messages/${messageId}/delete-for-me`);
+
+      setMessages((prev) => prev.filter((msg) => msg._id !== messageId));
+      toast.success("Message deleted for you");
+    } catch (err) {
+      console.error("Delete for me error:", err);
+      toast.error("Failed to delete message");
+    }
+  };
+
+  // Delete message for everyone
+  const deleteForEveryone = async (messageId) => {
+    if (!selectedUser) return;
+
+    try {
+      const res = await api.delete(
+        `/messages/${messageId}/delete-for-everyone`,
+      );
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? {
+                ...msg,
+                deletedForEveryone: true,
+                content: "",
+                imageUrl: null,
+              }
+            : msg,
+        ),
+      );
+
+      // Emit socket event
+      socket?.emit("message_deleted", {
+        messageId,
+        receiverId: selectedUser._id,
+        deleteType: "everyone",
+      });
+
+      toast.success("Message deleted for everyone");
+    } catch (err) {
+      console.error("Delete for everyone error:", err);
+      toast.error(err.response?.data?.message || "Failed to delete message");
+    }
+  };
+
+  // Edit message
+  const editMessage = async (messageId, content) => {
+    if (!selectedUser) return;
+
+    try {
+      const res = await api.put(`/messages/${messageId}/edit`, { content });
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, content, isEdited: true, editedAt: res.data.editedAt }
+            : msg,
+        ),
+      );
+
+      // Emit socket event
+      socket?.emit("message_edited", {
+        messageId,
+        content,
+        receiverId: selectedUser._id,
+        editedAt: res.data.editedAt,
+      });
+
+      setEditingMessage(null);
+      toast.success("Message edited");
+    } catch (err) {
+      console.error("Edit message error:", err);
+      toast.error(err.response?.data?.message || "Failed to edit message");
     }
   };
 
@@ -339,6 +544,14 @@ export const useChat = () => {
     loading,
     sendMessage,
     sendImage,
+    reactToMessage,
+    deleteForMe,
+    deleteForEveryone,
+    editMessage,
+    replyTo,
+    setReplyTo,
+    editingMessage,
+    setEditingMessage,
     setConversations,
     setMessages,
   };

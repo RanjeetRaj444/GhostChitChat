@@ -30,6 +30,7 @@ function ChatPage() {
   const { currentUser, logout } = useAuth();
   const { darkMode, toggleTheme } = useTheme();
 
+  // Private chat hooks
   const {
     conversations,
     users,
@@ -39,8 +40,17 @@ function ChatPage() {
     loading,
     sendMessage,
     sendImage,
+    reactToMessage,
+    deleteForMe,
+    deleteForEveryone,
+    editMessage,
+    replyTo,
+    setReplyTo,
+    editingMessage,
+    setEditingMessage,
   } = useChat();
 
+  // Group chat hooks
   const {
     groups,
     selectedGroup,
@@ -49,6 +59,14 @@ function ChatPage() {
     loading: groupLoading,
     sendGroupMessage,
     sendGroupImage,
+    reactToMessage: reactToGroupMessage,
+    deleteForMe: deleteGroupForMe,
+    deleteForEveryone: deleteGroupForEveryone,
+    editMessage: editGroupMessage,
+    replyTo: groupReplyTo,
+    setReplyTo: setGroupReplyTo,
+    editingMessage: groupEditingMessage,
+    setEditingMessage: setGroupEditingMessage,
     createGroup,
     addMembers,
     removeMember,
@@ -65,19 +83,87 @@ function ChatPage() {
     }
   };
 
-  const handleSendMessage = async (content) => {
+  const handleSendMessage = async (content, replyToId) => {
     if (selectedUser) {
-      await sendMessage(content);
+      await sendMessage(content, replyToId);
     } else if (selectedGroup) {
-      await sendGroupMessage(content);
+      await sendGroupMessage(content, replyToId);
     }
   };
 
-  const handleSendImage = async (imageFile) => {
+  const handleSendImage = async (imageFile, replyToId) => {
     if (selectedUser) {
-      await sendImage(imageFile);
+      await sendImage(imageFile, replyToId);
     } else if (selectedGroup) {
-      await sendGroupImage(imageFile);
+      await sendGroupImage(imageFile, replyToId);
+    }
+  };
+
+  const handleReply = (message) => {
+    if (selectedUser) {
+      setReplyTo(message);
+      setEditingMessage(null);
+    } else if (selectedGroup) {
+      setGroupReplyTo(message);
+      setGroupEditingMessage(null);
+    }
+  };
+
+  const handleCancelReply = () => {
+    if (selectedUser) {
+      setReplyTo(null);
+    } else if (selectedGroup) {
+      setGroupReplyTo(null);
+    }
+  };
+
+  const handleReact = async (messageId, emoji) => {
+    if (selectedUser) {
+      await reactToMessage(messageId, emoji);
+    } else if (selectedGroup) {
+      await reactToGroupMessage(messageId, emoji);
+    }
+  };
+
+  const handleDeleteForMe = async (messageId) => {
+    if (selectedUser) {
+      await deleteForMe(messageId);
+    } else if (selectedGroup) {
+      await deleteGroupForMe(messageId);
+    }
+  };
+
+  const handleDeleteForEveryone = async (messageId) => {
+    if (selectedUser) {
+      await deleteForEveryone(messageId);
+    } else if (selectedGroup) {
+      await deleteGroupForEveryone(messageId);
+    }
+  };
+
+  const handleEdit = (message) => {
+    if (selectedUser) {
+      setEditingMessage(message);
+      setReplyTo(null);
+    } else if (selectedGroup) {
+      setGroupEditingMessage(message);
+      setGroupReplyTo(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (selectedUser) {
+      setEditingMessage(null);
+    } else if (selectedGroup) {
+      setGroupEditingMessage(null);
+    }
+  };
+
+  const handleEditMessage = async (messageId, content) => {
+    if (selectedUser) {
+      await editMessage(messageId, content);
+    } else if (selectedGroup) {
+      await editGroupMessage(messageId, content);
     }
   };
 
@@ -89,11 +175,17 @@ function ChatPage() {
   const handleSelectUser = (user) => {
     setSelectedGroup(null);
     setSelectedUser(user);
+    // Clear reply/edit state
+    setReplyTo(null);
+    setEditingMessage(null);
   };
 
   const handleSelectGroup = (group) => {
     setSelectedUser(null);
     setSelectedGroup(group);
+    // Clear reply/edit state
+    setGroupReplyTo(null);
+    setGroupEditingMessage(null);
   };
 
   // Count online members in a group
@@ -106,6 +198,10 @@ function ChatPage() {
   const hasActiveChat = selectedUser || selectedGroup;
   const currentLoading = selectedGroup ? groupLoading : loading;
   const currentMessages = selectedGroup ? groupMessages : messages;
+  const currentReplyTo = selectedGroup ? groupReplyTo : replyTo;
+  const currentEditingMessage = selectedGroup
+    ? groupEditingMessage
+    : editingMessage;
 
   return (
     <div className="h-[100dvh] flex flex-col bg-neutral-50 dark:bg-neutral-900 overflow-hidden">
@@ -171,12 +267,22 @@ function ChatPage() {
                   selectedUser={selectedUser}
                   loading={currentLoading}
                   isGroup={!!selectedGroup}
+                  onReply={handleReply}
+                  onReact={handleReact}
+                  onDeleteForMe={handleDeleteForMe}
+                  onDeleteForEveryone={handleDeleteForEveryone}
+                  onEdit={handleEdit}
                 />
 
                 <ChatInput
                   onSendMessage={handleSendMessage}
                   onSendImage={handleSendImage}
                   onTyping={handleTyping}
+                  replyTo={currentReplyTo}
+                  onCancelReply={handleCancelReply}
+                  editingMessage={currentEditingMessage}
+                  onCancelEdit={handleCancelEdit}
+                  onEditMessage={handleEditMessage}
                 />
               </motion.div>
             ) : (

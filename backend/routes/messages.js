@@ -9,7 +9,7 @@ const router = express.Router();
 // Send text message
 router.post("/", auth, async (req, res) => {
   try {
-    const { receiverId, content } = req.body;
+    const { receiverId, content, replyToId } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ message: "Message cannot be empty" });
@@ -20,11 +20,19 @@ router.post("/", auth, async (req, res) => {
       receiver: receiverId,
       content,
       messageType: "text",
+      replyTo: replyToId || null,
     });
 
     await message.save();
     await message.populate("sender", "username avatar");
     await message.populate("receiver", "username avatar");
+    if (replyToId) {
+      await message.populate({
+        path: "replyTo",
+        select: "content sender messageType imageUrl",
+        populate: { path: "sender", select: "username avatar" },
+      });
+    }
 
     res.status(201).json(message);
   } catch (error) {
@@ -36,7 +44,7 @@ router.post("/", auth, async (req, res) => {
 // Send image message
 router.post("/image", auth, upload.single("image"), async (req, res) => {
   try {
-    const { receiverId } = req.body;
+    const { receiverId, replyToId } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ message: "No image provided" });
@@ -50,11 +58,19 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
       content: "",
       messageType: "image",
       imageUrl: imageUrl,
+      replyTo: replyToId || null,
     });
 
     await message.save();
     await message.populate("sender", "username avatar");
     await message.populate("receiver", "username avatar");
+    if (replyToId) {
+      await message.populate({
+        path: "replyTo",
+        select: "content sender messageType imageUrl",
+        populate: { path: "sender", select: "username avatar" },
+      });
+    }
 
     res.status(201).json(message);
   } catch (error) {
@@ -63,6 +79,7 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
   }
 });
 
+// Get messages for a conversation
 router.get("/:userId", auth, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -89,6 +106,7 @@ router.get("/:userId", auth, async (req, res) => {
   }
 });
 
+// Get all conversations
 router.get("/", auth, async (req, res) => {
   try {
     const conversations = await Message.getUserConversations(req.user._id);
@@ -99,6 +117,7 @@ router.get("/", auth, async (req, res) => {
   }
 });
 
+// Mark messages as read
 router.put("/read/:userId", auth, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -111,6 +130,182 @@ router.put("/read/:userId", auth, async (req, res) => {
     res.json({ updated: result.nModified });
   } catch (error) {
     console.error("Mark messages as read error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Add or toggle reaction to a message
+router.post("/:messageId/react", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+
+    if (!emoji) {
+      return res.status(400).json({ message: "Emoji is required" });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Check if user is part of the conversation
+    const isParticipant =
+      message.sender.toString() === req.user._id.toString() ||
+      message.receiver.toString() === req.user._id.toString();
+
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Find existing reaction from this user
+    const existingReactionIndex = message.reactions.findIndex(
+      (r) => r.user.toString() === req.user._id.toString(),
+    );
+
+    if (existingReactionIndex > -1) {
+      // If same emoji, remove reaction; otherwise update it
+      if (message.reactions[existingReactionIndex].emoji === emoji) {
+        message.reactions.splice(existingReactionIndex, 1);
+      } else {
+        message.reactions[existingReactionIndex].emoji = emoji;
+        message.reactions[existingReactionIndex].createdAt = new Date();
+      }
+    } else {
+      // Add new reaction
+      message.reactions.push({
+        user: req.user._id,
+        emoji,
+        createdAt: new Date(),
+      });
+    }
+
+    await message.save();
+    await message.populate("reactions.user", "username avatar");
+
+    res.json(message);
+  } catch (error) {
+    console.error("React to message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Delete message for me
+router.delete("/:messageId/delete-for-me", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Check if user is part of the conversation
+    const isParticipant =
+      message.sender.toString() === req.user._id.toString() ||
+      message.receiver.toString() === req.user._id.toString();
+
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Add user to deletedFor array if not already there
+    if (!message.deletedFor.includes(req.user._id)) {
+      message.deletedFor.push(req.user._id);
+    }
+
+    await message.save();
+
+    res.json({ success: true, messageId });
+  } catch (error) {
+    console.error("Delete message for me error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Delete message for everyone (only sender can do this)
+router.delete("/:messageId/delete-for-everyone", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Only sender can delete for everyone
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res
+        .status(403)
+        .json({ message: "Only sender can delete for everyone" });
+    }
+
+    // Check if message is within 1 hour (like WhatsApp)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    if (message.createdAt < oneHourAgo) {
+      return res.status(400).json({
+        message: "Can only delete messages within 1 hour of sending",
+      });
+    }
+
+    message.deletedForEveryone = true;
+    message.deletedAt = new Date();
+    message.content = "";
+    message.imageUrl = null;
+
+    await message.save();
+
+    res.json({ success: true, messageId, receiverId: message.receiver });
+  } catch (error) {
+    console.error("Delete message for everyone error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Edit message (only sender, within time limit)
+router.put("/:messageId/edit", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ message: "Content is required" });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Only sender can edit
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Only sender can edit message" });
+    }
+
+    // Can't edit image messages
+    if (message.messageType === "image") {
+      return res.status(400).json({ message: "Cannot edit image messages" });
+    }
+
+    // Check if message is within 15 minutes
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    if (message.createdAt < fifteenMinutesAgo) {
+      return res.status(400).json({
+        message: "Can only edit messages within 15 minutes of sending",
+      });
+    }
+
+    message.content = content.trim();
+    message.isEdited = true;
+    message.editedAt = new Date();
+
+    await message.save();
+    await message.populate("sender", "username avatar");
+    await message.populate("receiver", "username avatar");
+
+    res.json(message);
+  } catch (error) {
+    console.error("Edit message error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

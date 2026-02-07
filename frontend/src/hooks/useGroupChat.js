@@ -8,6 +8,8 @@ export const useGroupChat = () => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [groupMessages, setGroupMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [replyTo, setReplyTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
 
   const {
     socket,
@@ -32,7 +34,7 @@ export const useGroupChat = () => {
 
   // Fetch user's groups - only runs once on mount
   const fetchGroups = useCallback(async () => {
-    if (!api || !currentUser) return;
+    if (!api || !currentUser) return [];
 
     try {
       const res = await api.get("/groups");
@@ -50,7 +52,6 @@ export const useGroupChat = () => {
 
     const initGroups = async () => {
       const fetchedGroups = await fetchGroups();
-      // Join socket rooms for all groups
       fetchedGroups.forEach((group) => {
         joinGroupRoom(group._id);
       });
@@ -65,6 +66,8 @@ export const useGroupChat = () => {
     if (selectedGroup) {
       localStorage.setItem("selectedGroupId", selectedGroup._id);
       fetchGroupMessages(selectedGroup._id);
+      setReplyTo(null);
+      setEditingMessage(null);
     } else {
       localStorage.removeItem("selectedGroupId");
       setGroupMessages([]);
@@ -81,7 +84,6 @@ export const useGroupChat = () => {
       await api.put(`/group-messages/read/${groupId}`);
       markGroupRead(groupId);
 
-      // Reset unread count for this group
       setGroups((prev) =>
         prev.map((g) => (g._id === groupId ? { ...g, unreadCount: 0 } : g)),
       );
@@ -106,12 +108,10 @@ export const useGroupChat = () => {
         messageId,
       } = data;
 
-      // Skip if this is our own message (we already added it optimistically)
       if (senderId === currentUser._id) {
         return;
       }
 
-      // Update groups list with last message
       setGroups((prev) => {
         const idx = prev.findIndex((g) => g._id === groupId);
         if (idx === -1) return prev;
@@ -130,16 +130,13 @@ export const useGroupChat = () => {
           unreadCount: isSelected ? 0 : (updated[idx].unreadCount || 0) + 1,
         };
 
-        // Move to top
         const [group] = updated.splice(idx, 1);
         updated.unshift(group);
         return updated;
       });
 
-      // Add message to current chat if viewing this group
       if (selectedGroupRef.current?._id === groupId) {
         setGroupMessages((prev) => {
-          // Check for duplicate
           if (prev.some((m) => m._id === messageId)) return prev;
 
           return [
@@ -147,6 +144,10 @@ export const useGroupChat = () => {
             {
               _id: messageId || Date.now().toString(),
               content: message,
+              messageType: data.messageType || "text",
+              imageUrl: data.imageUrl || null,
+              replyTo: data.replyTo || null,
+              reactions: [],
               sender: {
                 _id: senderId,
                 username: senderProfile?.username,
@@ -164,15 +165,84 @@ export const useGroupChat = () => {
       }
     };
 
+    // Handle reaction updates
+    const handleReactionUpdate = (data) => {
+      const { messageId, emoji, userId, username, action } = data;
+      setGroupMessages((prev) =>
+        prev.map((msg) => {
+          if (msg._id !== messageId) return msg;
+          let reactions = [...(msg.reactions || [])];
+
+          if (action === "remove") {
+            reactions = reactions.filter(
+              (r) => !(r.user?._id === userId || r.user === userId),
+            );
+          } else {
+            const existingIdx = reactions.findIndex(
+              (r) => r.user?._id === userId || r.user === userId,
+            );
+            if (existingIdx > -1) {
+              reactions[existingIdx] = { ...reactions[existingIdx], emoji };
+            } else {
+              reactions.push({
+                user: { _id: userId, username },
+                emoji,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          }
+
+          return { ...msg, reactions };
+        }),
+      );
+    };
+
+    // Handle delete updates
+    const handleDeleteUpdate = (data) => {
+      const { messageId, deleteType } = data;
+      if (deleteType === "everyone") {
+        setGroupMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === messageId
+              ? {
+                  ...msg,
+                  deletedForEveryone: true,
+                  content: "",
+                  imageUrl: null,
+                }
+              : msg,
+          ),
+        );
+      }
+    };
+
+    // Handle edit updates
+    const handleEditUpdate = (data) => {
+      const { messageId, content, editedAt } = data;
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, content, isEdited: true, editedAt }
+            : msg,
+        ),
+      );
+    };
+
     socket.on("group_message", handleGroupMessage);
+    socket.on("group_message_reaction_update", handleReactionUpdate);
+    socket.on("group_message_deleted_update", handleDeleteUpdate);
+    socket.on("group_message_edited_update", handleEditUpdate);
 
     return () => {
       socket.off("group_message", handleGroupMessage);
+      socket.off("group_message_reaction_update", handleReactionUpdate);
+      socket.off("group_message_deleted_update", handleDeleteUpdate);
+      socket.off("group_message_edited_update", handleEditUpdate);
     };
   }, [socket, currentUser?._id, markGroupRead]);
 
   // Send message to group
-  const sendGroupMessage = async (content) => {
+  const sendGroupMessage = async (content, replyToId = null) => {
     if (!selectedGroup || !content.trim() || !api) return;
     const tempId = Date.now().toString();
 
@@ -180,6 +250,8 @@ export const useGroupChat = () => {
       _id: tempId,
       content,
       messageType: "text",
+      replyTo: replyTo || null,
+      reactions: [],
       sender: {
         _id: currentUser._id,
         username: currentUser.username,
@@ -191,19 +263,17 @@ export const useGroupChat = () => {
       failed: false,
     };
 
-    // Add message optimistically
     setGroupMessages((prev) => [...prev, newMessage]);
-
-    // Update group list optimistically
     updateGroupList(selectedGroup._id, content);
+    setReplyTo(null);
 
     try {
       const res = await api.post("/group-messages", {
         groupId: selectedGroup._id,
         content,
+        replyToId: replyToId || replyTo?._id,
       });
 
-      // Update the temp message with the real one from server
       setGroupMessages((prev) =>
         prev.map((msg) =>
           msg._id === tempId
@@ -212,7 +282,6 @@ export const useGroupChat = () => {
         ),
       );
 
-      // Send via socket for real-time delivery to other users
       sendSocketGroupMessage(selectedGroup._id, content, res.data._id);
     } catch (err) {
       console.error("Send group message error:", err);
@@ -226,11 +295,10 @@ export const useGroupChat = () => {
   };
 
   // Send image to group
-  const sendGroupImage = async (imageFile) => {
+  const sendGroupImage = async (imageFile, replyToId = null) => {
     if (!selectedGroup || !imageFile || !api) return;
     const tempId = Date.now().toString();
 
-    // Create a local URL for preview
     const localImageUrl = URL.createObjectURL(imageFile);
 
     const newMessage = {
@@ -238,6 +306,8 @@ export const useGroupChat = () => {
       content: "",
       messageType: "image",
       imageUrl: localImageUrl,
+      replyTo: replyTo || null,
+      reactions: [],
       sender: {
         _id: currentUser._id,
         username: currentUser.username,
@@ -249,27 +319,24 @@ export const useGroupChat = () => {
       failed: false,
     };
 
-    // Add message optimistically
     setGroupMessages((prev) => [...prev, newMessage]);
-
-    // Update group list optimistically with image indicator
     updateGroupList(selectedGroup._id, "📷 Image");
+    setReplyTo(null);
 
     try {
       const formData = new FormData();
       formData.append("image", imageFile);
       formData.append("groupId", selectedGroup._id);
+      if (replyToId || replyTo?._id) {
+        formData.append("replyToId", replyToId || replyTo._id);
+      }
 
       const res = await api.post("/group-messages/image", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      // Clean up local URL
       URL.revokeObjectURL(localImageUrl);
 
-      // Update the temp message with the real one from server
       setGroupMessages((prev) =>
         prev.map((msg) =>
           msg._id === tempId
@@ -278,7 +345,6 @@ export const useGroupChat = () => {
         ),
       );
 
-      // Send via socket for real-time delivery to other users
       sendSocketGroupMessage(selectedGroup._id, "📷 Image", res.data._id);
     } catch (err) {
       console.error("Send group image error:", err);
@@ -289,6 +355,119 @@ export const useGroupChat = () => {
         ),
       );
       toast.error("Failed to send image");
+    }
+  };
+
+  // React to a group message
+  const reactToMessage = async (messageId, emoji) => {
+    if (!selectedGroup) return;
+
+    // Check if user already has this reaction (for determining socket action)
+    const message = groupMessages.find((m) => m._id === messageId);
+    const existingReaction = message?.reactions?.find(
+      (r) =>
+        (r.user?._id === currentUser._id || r.user === currentUser._id) &&
+        r.emoji === emoji,
+    );
+    const action = existingReaction ? "remove" : "add";
+
+    try {
+      const res = await api.post(`/group-messages/${messageId}/react`, {
+        emoji,
+      });
+
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, reactions: res.data.reactions }
+            : msg,
+        ),
+      );
+
+      socket?.emit("group_message_reaction", {
+        groupId: selectedGroup._id,
+        messageId,
+        emoji,
+        userId: currentUser._id,
+        username: currentUser.username,
+        action,
+      });
+    } catch (err) {
+      console.error("React to group message error:", err);
+      toast.error("Failed to react");
+    }
+  };
+
+  // Delete group message for me
+  const deleteForMe = async (messageId) => {
+    try {
+      await api.delete(`/group-messages/${messageId}/delete-for-me`);
+
+      setGroupMessages((prev) => prev.filter((msg) => msg._id !== messageId));
+      toast.success("Message deleted for you");
+    } catch (err) {
+      console.error("Delete for me error:", err);
+      toast.error("Failed to delete message");
+    }
+  };
+
+  // Delete group message for everyone
+  const deleteForEveryone = async (messageId) => {
+    if (!selectedGroup) return;
+
+    try {
+      await api.delete(`/group-messages/${messageId}/delete-for-everyone`);
+
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, deletedForEveryone: true, content: "", imageUrl: null }
+            : msg,
+        ),
+      );
+
+      socket?.emit("group_message_deleted", {
+        groupId: selectedGroup._id,
+        messageId,
+        deleteType: "everyone",
+      });
+
+      toast.success("Message deleted for everyone");
+    } catch (err) {
+      console.error("Delete for everyone error:", err);
+      toast.error(err.response?.data?.message || "Failed to delete message");
+    }
+  };
+
+  // Edit group message
+  const editMessage = async (messageId, content) => {
+    if (!selectedGroup) return;
+
+    try {
+      const res = await api.put(`/group-messages/${messageId}/edit`, {
+        content,
+      });
+
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, content, isEdited: true, editedAt: res.data.editedAt }
+            : msg,
+        ),
+      );
+
+      socket?.emit("group_message_edited", {
+        groupId: selectedGroup._id,
+        messageId,
+        content,
+        editedAt: res.data.editedAt,
+      });
+
+      setEditingMessage(null);
+      toast.success("Message edited");
+    } catch (err) {
+      console.error("Edit group message error:", err);
+      toast.error(err.response?.data?.message || "Failed to edit message");
     }
   };
 
@@ -324,17 +503,9 @@ export const useGroupChat = () => {
     if (!api) return null;
 
     try {
-      const res = await api.post("/groups", {
-        name,
-        description,
-        memberIds,
-      });
+      const res = await api.post("/groups", { name, description, memberIds });
 
-      const newGroup = {
-        ...res.data,
-        lastMessage: null,
-        unreadCount: 0,
-      };
+      const newGroup = { ...res.data, lastMessage: null, unreadCount: 0 };
 
       setGroups((prev) => [newGroup, ...prev]);
       joinGroupRoom(newGroup._id);
@@ -478,6 +649,14 @@ export const useGroupChat = () => {
     loading,
     sendGroupMessage,
     sendGroupImage,
+    reactToMessage,
+    deleteForMe,
+    deleteForEveryone,
+    editMessage,
+    replyTo,
+    setReplyTo,
+    editingMessage,
+    setEditingMessage,
     createGroup,
     addMembers,
     removeMember,

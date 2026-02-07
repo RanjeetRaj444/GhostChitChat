@@ -1,7 +1,10 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaImage } from "react-icons/fa";
+import MessageActions from "./MessageActions";
+import ReplyPreview from "./ReplyPreview";
+import toast from "react-hot-toast";
 
 function ChatWindow({
   messages,
@@ -9,6 +12,11 @@ function ChatWindow({
   selectedUser,
   loading,
   isGroup = false,
+  onReply,
+  onReact,
+  onDeleteForMe,
+  onDeleteForEveryone,
+  onEdit,
 }) {
   const endRef = useRef(null);
   const [lightboxImage, setLightboxImage] = useState(null);
@@ -25,6 +33,20 @@ function ChatWindow({
     } catch (error) {
       return "";
     }
+  };
+
+  // Check if message can be edited (within 15 minutes)
+  const canEditMessage = (message) => {
+    if (!message.createdAt) return false;
+    const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000;
+    return new Date(message.createdAt).getTime() > fifteenMinutesAgo;
+  };
+
+  // Check if message can be deleted for everyone (within 1 hour)
+  const canDeleteForEveryoneMessage = (message) => {
+    if (!message.createdAt) return false;
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    return new Date(message.createdAt).getTime() > oneHourAgo;
   };
 
   const groupedMessages = useMemo(() => {
@@ -61,8 +83,26 @@ function ChatWindow({
   const getImageUrl = (imageUrl) => {
     if (!imageUrl) return null;
     if (imageUrl.startsWith("http")) return imageUrl;
-    // Prepend the API URL for relative paths
     return `${import.meta.env.VITE_API_URL}${imageUrl}`;
+  };
+
+  // Group reactions by emoji
+  const groupReactions = (reactions) => {
+    if (!reactions || reactions.length === 0) return [];
+    const grouped = {};
+    reactions.forEach((r) => {
+      const emoji = r.emoji;
+      if (!grouped[emoji]) {
+        grouped[emoji] = { emoji, count: 0, users: [] };
+      }
+      grouped[emoji].count++;
+      grouped[emoji].users.push(r.user?.username || "Unknown");
+    });
+    return Object.values(grouped);
+  };
+
+  const handleCopy = () => {
+    toast.success("Copied to clipboard");
   };
 
   return (
@@ -110,12 +150,13 @@ function ChatWindow({
                     (message.sender._id === currentUser._id ||
                       message.sender === currentUser._id);
 
-                  // For group messages, get sender info
                   const senderName = message.sender?.username || "Unknown";
                   const senderAvatar =
                     message.sender?.avatar || "/default-avatar.svg";
 
                   const isImageMessage = message.messageType === "image";
+                  const isDeleted = message.deletedForEveryone;
+                  const reactions = groupReactions(message.reactions);
 
                   return (
                     <motion.div
@@ -150,7 +191,7 @@ function ChatWindow({
                         />
                       )}
 
-                      <div className="flex flex-col max-w-[75%]">
+                      <div className={`flex flex-col max-w-[75%] relative`}>
                         {/* Show sender name in groups for messages not sent by current user */}
                         {isGroup && !isSentByCurrentUser && (
                           <span className="text-xs font-semibold text-primary-500 dark:text-primary-400 mb-1 ml-1">
@@ -158,45 +199,150 @@ function ChatWindow({
                           </span>
                         )}
 
-                        {isImageMessage ? (
-                          <motion.div
-                            layout
-                            className={`relative cursor-pointer overflow-hidden rounded-2xl ${
-                              isSentByCurrentUser
-                                ? "rounded-br-none"
-                                : "rounded-bl-none"
-                            }`}
-                            onClick={() =>
-                              setLightboxImage(getImageUrl(message.imageUrl))
-                            }
-                          >
-                            <img
-                              src={getImageUrl(message.imageUrl)}
-                              alt="Shared image"
-                              className="max-w-full max-h-64 object-cover rounded-2xl hover:opacity-90 transition-opacity"
-                              loading="lazy"
-                            />
-                            {message.isSending && (
-                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-2xl">
-                                <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                        <div className="flex items-center gap-2 group/bubble">
+                          {isSentByCurrentUser &&
+                            !isDeleted &&
+                            !message.isSending && (
+                              <MessageActions
+                                message={message}
+                                isSentByCurrentUser={isSentByCurrentUser}
+                                currentUserId={currentUser?._id}
+                                onReply={onReply}
+                                onReact={(messageId, emoji) =>
+                                  onReact?.(messageId, emoji)
+                                }
+                                onDeleteForMe={onDeleteForMe}
+                                onDeleteForEveryone={onDeleteForEveryone}
+                                onEdit={onEdit}
+                                onCopy={handleCopy}
+                                canEdit={canEditMessage(message)}
+                                canDeleteForEveryone={canDeleteForEveryoneMessage(
+                                  message,
+                                )}
+                              />
+                            )}
+
+                          <div className="flex flex-col flex-1">
+                            {/* Reply preview inside message */}
+                            {message.replyTo && !isDeleted && (
+                              <div
+                                className={`${isSentByCurrentUser ? "bg-primary-700/30" : "bg-neutral-200 dark:bg-neutral-700"} rounded-xl rounded-b-none px-3 py-2`}
+                              >
+                                <ReplyPreview
+                                  replyTo={message.replyTo}
+                                  isInMessage={true}
+                                />
                               </div>
                             )}
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            layout
-                            className={`message-bubble relative ${
-                              isSentByCurrentUser
-                                ? "message-sent rounded-br-none"
-                                : "message-received rounded-bl-none"
-                            }`}
+
+                            {/* Message content */}
+                            {isDeleted ? (
+                              <motion.div
+                                layout
+                                className={`message-bubble italic ${
+                                  isSentByCurrentUser
+                                    ? "bg-neutral-400 dark:bg-neutral-600 text-neutral-200 rounded-br-none"
+                                    : "bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400 rounded-bl-none"
+                                }`}
+                              >
+                                🚫 This message was deleted
+                              </motion.div>
+                            ) : isImageMessage ? (
+                              <motion.div
+                                layout
+                                className={`relative cursor-pointer overflow-hidden rounded-2xl ${
+                                  isSentByCurrentUser
+                                    ? "rounded-br-none"
+                                    : "rounded-bl-none"
+                                } ${message.replyTo ? "rounded-t-none" : ""}`}
+                                onClick={() =>
+                                  setLightboxImage(
+                                    getImageUrl(message.imageUrl),
+                                  )
+                                }
+                              >
+                                <img
+                                  src={getImageUrl(message.imageUrl)}
+                                  alt="Shared image"
+                                  className="max-w-full max-h-64 object-cover rounded-2xl hover:opacity-90 transition-opacity"
+                                  loading="lazy"
+                                />
+                                {message.isSending && (
+                                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-2xl">
+                                    <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                                  </div>
+                                )}
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                layout
+                                className={`message-bubble relative ${
+                                  isSentByCurrentUser
+                                    ? "message-sent rounded-br-none"
+                                    : "message-received rounded-bl-none"
+                                } ${message.replyTo ? "rounded-t-none" : ""}`}
+                              >
+                                {message.content}
+                                {message.isEdited && (
+                                  <span className="ml-2 text-[10px] opacity-60">
+                                    (edited)
+                                  </span>
+                                )}
+                              </motion.div>
+                            )}
+                          </div>
+
+                          {!isSentByCurrentUser &&
+                            !isDeleted &&
+                            !message.isSending && (
+                              <MessageActions
+                                message={message}
+                                isSentByCurrentUser={isSentByCurrentUser}
+                                currentUserId={currentUser?._id}
+                                onReply={onReply}
+                                onReact={(messageId, emoji) =>
+                                  onReact?.(messageId, emoji)
+                                }
+                                onDeleteForMe={onDeleteForMe}
+                                onDeleteForEveryone={onDeleteForEveryone}
+                                onEdit={onEdit}
+                                onCopy={handleCopy}
+                                canEdit={canEditMessage(message)}
+                                canDeleteForEveryone={canDeleteForEveryoneMessage(
+                                  message,
+                                )}
+                              />
+                            )}
+                        </div>
+
+                        {/* Reactions display */}
+                        {reactions.length > 0 && !isDeleted && (
+                          <div
+                            className={`flex flex-wrap gap-1 mt-1 ${isSentByCurrentUser ? "justify-end" : "justify-start"}`}
                           >
-                            {message.content}
-                          </motion.div>
+                            {reactions.map((r, i) => (
+                              <motion.div
+                                key={i}
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white dark:bg-neutral-800 rounded-full border border-neutral-200 dark:border-neutral-700 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                                title={r.users.join(", ")}
+                                onClick={() => onReact?.(message._id, r.emoji)}
+                              >
+                                <span className="text-sm">{r.emoji}</span>
+                                {r.count > 1 && (
+                                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                    {r.count}
+                                  </span>
+                                )}
+                              </motion.div>
+                            ))}
+                          </div>
                         )}
 
+                        {/* Time and status */}
                         <div
-                          className={`flex items-center text-xs mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
+                          className={`flex items-center text-xs mt-1 px-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity duration-200 ${
                             isSentByCurrentUser
                               ? "justify-end"
                               : "justify-start"

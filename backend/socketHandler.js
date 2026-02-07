@@ -16,6 +16,9 @@ export const socketHandler = (io) => {
       }
       connectedUsers.get(userId).add(socket.id);
 
+      // Store userId on socket for later use
+      socket.userId = userId;
+
       console.log(`User ${userId} connected on socket ${socket.id}`);
 
       // Broadcast online status
@@ -26,7 +29,15 @@ export const socketHandler = (io) => {
     });
 
     socket.on("private_message", (data) => {
-      const { receiverId, message, senderId, timestamp } = data;
+      const {
+        receiverId,
+        message,
+        senderId,
+        timestamp,
+        messageType,
+        imageUrl,
+        replyTo,
+      } = data;
       const receiverSockets = connectedUsers.get(receiverId);
 
       // Clear typing indicator on message send
@@ -47,9 +58,14 @@ export const socketHandler = (io) => {
         receiverSockets.forEach((sockId) =>
           io.to(sockId).emit("private_message", {
             senderId,
+            receiverId,
             message,
             timestamp,
+            messageType,
+            imageUrl,
+            replyTo,
             senderProfile: data.senderProfile,
+            messageId: data.messageId,
           }),
         );
       }
@@ -96,6 +112,62 @@ export const socketHandler = (io) => {
       }
     });
 
+    // ==================== REACTION EVENTS ====================
+
+    socket.on("message_reaction", (data) => {
+      const { messageId, emoji, userId, receiverId, username, action } = data;
+
+      // Send reaction update to receiver
+      const receiverSockets = connectedUsers.get(receiverId);
+      if (receiverSockets) {
+        receiverSockets.forEach((sockId) =>
+          io.to(sockId).emit("message_reaction_update", {
+            messageId,
+            emoji,
+            userId,
+            username,
+            action, // 'add' or 'remove'
+          }),
+        );
+      }
+    });
+
+    // ==================== DELETE EVENTS ====================
+
+    socket.on("message_deleted", (data) => {
+      const { messageId, receiverId, deleteType } = data;
+
+      // If deleted for everyone, notify the receiver
+      if (deleteType === "everyone") {
+        const receiverSockets = connectedUsers.get(receiverId);
+        if (receiverSockets) {
+          receiverSockets.forEach((sockId) =>
+            io.to(sockId).emit("message_deleted_update", {
+              messageId,
+              deleteType,
+            }),
+          );
+        }
+      }
+    });
+
+    // ==================== EDIT EVENTS ====================
+
+    socket.on("message_edited", (data) => {
+      const { messageId, content, receiverId, editedAt } = data;
+
+      const receiverSockets = connectedUsers.get(receiverId);
+      if (receiverSockets) {
+        receiverSockets.forEach((sockId) =>
+          io.to(sockId).emit("message_edited_update", {
+            messageId,
+            content,
+            editedAt,
+          }),
+        );
+      }
+    });
+
     // ==================== GROUP EVENTS ====================
 
     // Join a group room
@@ -119,6 +191,9 @@ export const socketHandler = (io) => {
         timestamp,
         senderProfile,
         messageId,
+        messageType,
+        imageUrl,
+        replyTo,
       } = data;
 
       // Broadcast to all members in the group room (including sender for confirmation)
@@ -129,6 +204,9 @@ export const socketHandler = (io) => {
         timestamp,
         senderProfile,
         messageId,
+        messageType,
+        imageUrl,
+        replyTo,
       });
     });
 
@@ -154,6 +232,43 @@ export const socketHandler = (io) => {
         groupId,
         userId,
         readAt: new Date().toISOString(),
+      });
+    });
+
+    // Group message reaction
+    socket.on("group_message_reaction", (data) => {
+      const { groupId, messageId, emoji, userId, username, action } = data;
+
+      // Broadcast reaction to all group members
+      io.to(`group:${groupId}`).emit("group_message_reaction_update", {
+        messageId,
+        emoji,
+        userId,
+        username,
+        action,
+      });
+    });
+
+    // Group message deleted
+    socket.on("group_message_deleted", (data) => {
+      const { groupId, messageId, deleteType } = data;
+
+      if (deleteType === "everyone") {
+        io.to(`group:${groupId}`).emit("group_message_deleted_update", {
+          messageId,
+          deleteType,
+        });
+      }
+    });
+
+    // Group message edited
+    socket.on("group_message_edited", (data) => {
+      const { groupId, messageId, content, editedAt } = data;
+
+      io.to(`group:${groupId}`).emit("group_message_edited_update", {
+        messageId,
+        content,
+        editedAt,
       });
     });
 

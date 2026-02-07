@@ -26,11 +26,59 @@ const messageSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Reply functionality
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ChatMessage",
+      default: null,
+    },
+    // Reactions - array of user reactions
+    reactions: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "ChatUser",
+        },
+        emoji: {
+          type: String,
+          required: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    // Soft delete for specific users
+    deletedFor: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ChatUser",
+      },
+    ],
+    // Delete for everyone flag
+    deletedForEveryone: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
     isRead: {
       type: Boolean,
       default: false,
     },
     readAt: {
+      type: Date,
+      default: null,
+    },
+    // Edit tracking
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    editedAt: {
       type: Date,
       default: null,
     },
@@ -54,12 +102,22 @@ messageSchema.statics.getConversation = async function (
       { sender: userId1, receiver: userId2 },
       { sender: userId2, receiver: userId1 },
     ],
+    deletedFor: { $ne: userId1 }, // Exclude messages deleted for this user
   })
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
     .populate("sender", "username avatar")
-    .populate("receiver", "username avatar");
+    .populate("receiver", "username avatar")
+    .populate({
+      path: "replyTo",
+      select: "content sender messageType imageUrl",
+      populate: {
+        path: "sender",
+        select: "username avatar",
+      },
+    })
+    .populate("reactions.user", "username avatar");
 };
 
 messageSchema.statics.getUserConversations = async function (userId) {
@@ -70,6 +128,7 @@ messageSchema.statics.getUserConversations = async function (userId) {
           { sender: new mongoose.Types.ObjectId(userId) },
           { receiver: new mongoose.Types.ObjectId(userId) },
         ],
+        deletedFor: { $ne: new mongoose.Types.ObjectId(userId) },
       },
     },
     { $sort: { createdAt: -1 } },
