@@ -95,8 +95,10 @@ export const useChat = () => {
 
       setConversations((prev) => {
         let idx = prev.findIndex((c) => c.user._id === otherUserId);
+        const messageContent =
+          data.messageType === "image" ? "📷 Image" : data.message;
         const newMsgForConv = {
-          content: data.message,
+          content: messageContent,
           createdAt: data.timestamp,
           sender: data.senderId,
         };
@@ -136,7 +138,9 @@ export const useChat = () => {
             ...prev,
             {
               _id: data.messageId || Date.now().toString(),
-              content: data.message,
+              content: data.message || "",
+              messageType: data.messageType || "text",
+              imageUrl: data.imageUrl || null,
               sender: {
                 _id: data.senderId,
                 username: data.senderProfile?.username,
@@ -183,6 +187,7 @@ export const useChat = () => {
     const newMessage = {
       _id: tempId,
       content,
+      messageType: "text",
       sender: {
         _id: currentUser._id,
         username: currentUser.username,
@@ -228,6 +233,76 @@ export const useChat = () => {
     }
   };
 
+  // Send image message
+  const sendImage = async (imageFile) => {
+    if (!selectedUser || !imageFile) return;
+    const tempId = Date.now().toString();
+
+    // Create a local URL for preview
+    const localImageUrl = URL.createObjectURL(imageFile);
+
+    const newMessage = {
+      _id: tempId,
+      content: "",
+      messageType: "image",
+      imageUrl: localImageUrl,
+      sender: {
+        _id: currentUser._id,
+        username: currentUser.username,
+        avatar: currentUser.avatar || "/default-avatar.svg",
+      },
+      receiver: {
+        _id: selectedUser._id,
+        username: selectedUser.username,
+        avatar: selectedUser.avatar || "/default-avatar.svg",
+      },
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      isSending: true,
+      failed: false,
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", imageFile);
+      formData.append("receiverId", selectedUser._id);
+
+      const res = await api.post("/messages/image", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      // Clean up local URL
+      URL.revokeObjectURL(localImageUrl);
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId
+            ? { ...res.data, isSending: false, failed: false }
+            : msg,
+        ),
+      );
+
+      // Update conversation list with image indicator
+      updateConversationList(selectedUser._id, "📷 Image");
+
+      // Send socket notification to receiver
+      sendSocketMessage(selectedUser._id, "📷 Image", res.data._id);
+    } catch (err) {
+      console.error("Send image error:", err);
+      URL.revokeObjectURL(localImageUrl);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg,
+        ),
+      );
+      toast.error("Failed to send image");
+    }
+  };
+
   const updateConversationList = (userId, content) => {
     const now = new Date().toISOString();
     setConversations((prev) => {
@@ -263,6 +338,7 @@ export const useChat = () => {
     messages,
     loading,
     sendMessage,
+    sendImage,
     setConversations,
     setMessages,
   };

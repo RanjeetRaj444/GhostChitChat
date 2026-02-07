@@ -31,6 +31,15 @@
 }
 
 @layer components {
+  /* Form elements */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl bg-neutral-100 dark:bg-neutral-700/50 border-2 border-transparent focus:border-primary-500 focus:bg-white dark:focus:bg-neutral-700 transition-all outline-none text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500;
+  }
+
+  .form-label {
+    @apply block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2;
+  }
+
   .btn {
     @apply px-4 py-2 rounded-xl font-bold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-95;
   }

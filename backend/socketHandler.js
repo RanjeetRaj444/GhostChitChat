@@ -96,6 +96,67 @@ export const socketHandler = (io) => {
       }
     });
 
+    // ==================== GROUP EVENTS ====================
+
+    // Join a group room
+    socket.on("join_group", (groupId) => {
+      socket.join(`group:${groupId}`);
+      console.log(`Socket ${socket.id} joined group:${groupId}`);
+    });
+
+    // Leave a group room
+    socket.on("leave_group", (groupId) => {
+      socket.leave(`group:${groupId}`);
+      console.log(`Socket ${socket.id} left group:${groupId}`);
+    });
+
+    // Handle group message
+    socket.on("group_message", (data) => {
+      const {
+        groupId,
+        message,
+        senderId,
+        timestamp,
+        senderProfile,
+        messageId,
+      } = data;
+
+      // Broadcast to all members in the group room (including sender for confirmation)
+      io.to(`group:${groupId}`).emit("group_message", {
+        groupId,
+        senderId,
+        message,
+        timestamp,
+        senderProfile,
+        messageId,
+      });
+    });
+
+    // Handle group typing indicator
+    socket.on("group_typing", (data) => {
+      const { groupId, senderId, isTyping, senderName } = data;
+
+      // Broadcast to other members in the group (exclude sender)
+      socket.to(`group:${groupId}`).emit("group_typing_status", {
+        groupId,
+        userId: senderId,
+        isTyping,
+        senderName,
+      });
+    });
+
+    // Mark group messages as read
+    socket.on("group_mark_read", (data) => {
+      const { groupId, userId } = data;
+
+      // Notify other members that this user has read messages
+      socket.to(`group:${groupId}`).emit("group_messages_read", {
+        groupId,
+        userId,
+        readAt: new Date().toISOString(),
+      });
+    });
+
     socket.on("disconnect", () => {
       console.log("Client disconnected", socket.id);
 

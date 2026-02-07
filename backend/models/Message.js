@@ -14,8 +14,17 @@ const messageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
+      default: "",
       trim: true,
+    },
+    messageType: {
+      type: String,
+      enum: ["text", "image"],
+      default: "text",
+    },
+    imageUrl: {
+      type: String,
+      default: null,
     },
     isRead: {
       type: Boolean,
@@ -28,7 +37,7 @@ const messageSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 messageSchema.index({ sender: 1, receiver: 1 });
@@ -38,7 +47,7 @@ messageSchema.statics.getConversation = async function (
   userId1,
   userId2,
   limit = 50,
-  skip = 0
+  skip = 0,
 ) {
   return this.find({
     $or: [

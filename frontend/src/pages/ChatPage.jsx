@@ -3,17 +3,30 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { useSocket } from "../contexts/SocketContext";
 import { useChat } from "../hooks/useChat";
+import { useGroupChat } from "../hooks/useGroupChat";
 import Sidebar from "../components/Sidebar";
 import ChatHeader from "../components/ChatHeader";
 import ChatWindow from "../components/ChatWindow";
 import ChatInput from "../components/ChatInput";
 import UserProfileModal from "../components/UserProfileModal";
+import CreateGroupModal from "../components/CreateGroupModal";
+import GroupChatHeader from "../components/GroupChatHeader";
+import GroupInfoModal from "../components/GroupInfoModal";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 
 function ChatPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const { isUserOnline, isUserTyping, sendTypingStatus } = useSocket();
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+
+  const {
+    isUserOnline,
+    isUserTyping,
+    sendTypingStatus,
+    getGroupTypingUsers,
+    sendGroupTypingStatus,
+  } = useSocket();
   const { currentUser, logout } = useAuth();
   const { darkMode, toggleTheme } = useTheme();
 
@@ -25,11 +38,46 @@ function ChatPage() {
     messages,
     loading,
     sendMessage,
+    sendImage,
   } = useChat();
+
+  const {
+    groups,
+    selectedGroup,
+    setSelectedGroup,
+    groupMessages,
+    loading: groupLoading,
+    sendGroupMessage,
+    sendGroupImage,
+    createGroup,
+    addMembers,
+    removeMember,
+    leaveGroup,
+    deleteGroup,
+    updateGroup,
+  } = useGroupChat();
 
   const handleTyping = (isTyping) => {
     if (selectedUser) {
       sendTypingStatus(selectedUser._id, isTyping);
+    } else if (selectedGroup) {
+      sendGroupTypingStatus(selectedGroup._id, isTyping);
+    }
+  };
+
+  const handleSendMessage = async (content) => {
+    if (selectedUser) {
+      await sendMessage(content);
+    } else if (selectedGroup) {
+      await sendGroupMessage(content);
+    }
+  };
+
+  const handleSendImage = async (imageFile) => {
+    if (selectedUser) {
+      await sendImage(imageFile);
+    } else if (selectedGroup) {
+      await sendGroupImage(imageFile);
     }
   };
 
@@ -38,6 +86,27 @@ function ChatPage() {
     toast.success("Logged out successfully");
   };
 
+  const handleSelectUser = (user) => {
+    setSelectedGroup(null);
+    setSelectedUser(user);
+  };
+
+  const handleSelectGroup = (group) => {
+    setSelectedUser(null);
+    setSelectedGroup(group);
+  };
+
+  // Count online members in a group
+  const getOnlineCount = () => {
+    if (!selectedGroup?.members) return 0;
+    return selectedGroup.members.filter((m) => isUserOnline(m._id || m)).length;
+  };
+
+  // Determine current chat state
+  const hasActiveChat = selectedUser || selectedGroup;
+  const currentLoading = selectedGroup ? groupLoading : loading;
+  const currentMessages = selectedGroup ? groupMessages : messages;
+
   return (
     <div className="h-[100dvh] flex flex-col bg-neutral-50 dark:bg-neutral-900 overflow-hidden">
       <div className="flex h-full relative">
@@ -45,51 +114,68 @@ function ChatPage() {
           initial={{ x: -300, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className={`${selectedUser ? "hidden md:flex" : "flex"} h-full`}
+          className={`${hasActiveChat ? "hidden md:flex" : "flex"} h-full`}
         >
           <Sidebar
             conversations={conversations}
             users={users}
             selectedUser={selectedUser}
-            onSelectUser={setSelectedUser}
+            onSelectUser={handleSelectUser}
             onLogout={handleLogout}
             onOpenProfile={() => setShowProfileModal(true)}
             currentUser={currentUser}
             isUserOnline={isUserOnline}
             darkMode={darkMode}
             toggleTheme={toggleTheme}
+            // Group props
+            groups={groups}
+            selectedGroup={selectedGroup}
+            onSelectGroup={handleSelectGroup}
+            onCreateGroupClick={() => setShowCreateGroupModal(true)}
           />
         </motion.div>
 
         <main
-          className={`flex-1 flex flex-col overflow-hidden ${selectedUser ? "flex" : "hidden md:flex"}`}
+          className={`flex-1 flex flex-col overflow-hidden ${hasActiveChat ? "flex" : "hidden md:flex"}`}
         >
           <AnimatePresence mode="wait">
-            {selectedUser ? (
+            {hasActiveChat ? (
               <motion.div
-                key={selectedUser._id}
+                key={selectedUser?._id || selectedGroup?._id}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
                 className="flex-1 flex flex-col overflow-hidden"
               >
-                <ChatHeader
-                  user={selectedUser}
-                  isOnline={isUserOnline(selectedUser._id)}
-                  isTyping={isUserTyping(selectedUser._id)}
-                  onBack={() => setSelectedUser(null)}
-                />
+                {selectedUser ? (
+                  <ChatHeader
+                    user={selectedUser}
+                    isOnline={isUserOnline(selectedUser._id)}
+                    isTyping={isUserTyping(selectedUser._id)}
+                    onBack={() => setSelectedUser(null)}
+                  />
+                ) : (
+                  <GroupChatHeader
+                    group={selectedGroup}
+                    typingUsers={getGroupTypingUsers(selectedGroup?._id)}
+                    onBack={() => setSelectedGroup(null)}
+                    onOpenInfo={() => setShowGroupInfoModal(true)}
+                    onlineCount={getOnlineCount()}
+                  />
+                )}
 
                 <ChatWindow
-                  messages={messages}
+                  messages={currentMessages}
                   currentUser={currentUser}
                   selectedUser={selectedUser}
-                  loading={loading}
+                  loading={currentLoading}
+                  isGroup={!!selectedGroup}
                 />
 
                 <ChatInput
-                  onSendMessage={sendMessage}
+                  onSendMessage={handleSendMessage}
+                  onSendImage={handleSendImage}
                   onTyping={handleTyping}
                 />
               </motion.div>
@@ -165,7 +251,8 @@ function ChatPage() {
                     className="text-xl text-neutral-600 dark:text-neutral-300 mb-10 max-w-lg mx-auto leading-relaxed"
                   >
                     Connect freely, chat securely. Select a conversation from
-                    the sidebar to start talking, or invite someone new.
+                    the sidebar to start talking, or create a group to chat with
+                    multiple friends.
                   </motion.p>
                 </div>
               </motion.div>
@@ -180,6 +267,30 @@ function ChatPage() {
             user={currentUser}
             onClose={() => setShowProfileModal(false)}
             onUpdate={() => setShowProfileModal(false)}
+          />
+        )}
+
+        {showCreateGroupModal && (
+          <CreateGroupModal
+            users={users}
+            currentUserId={currentUser._id}
+            onClose={() => setShowCreateGroupModal(false)}
+            onCreateGroup={createGroup}
+          />
+        )}
+
+        {showGroupInfoModal && selectedGroup && (
+          <GroupInfoModal
+            group={selectedGroup}
+            currentUserId={currentUser._id}
+            users={users}
+            isUserOnline={isUserOnline}
+            onClose={() => setShowGroupInfoModal(false)}
+            onAddMembers={addMembers}
+            onRemoveMember={removeMember}
+            onLeaveGroup={leaveGroup}
+            onDeleteGroup={deleteGroup}
+            onUpdateGroup={updateGroup}
           />
         )}
       </AnimatePresence>

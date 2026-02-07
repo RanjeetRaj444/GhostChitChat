@@ -1,15 +1,17 @@
 import express from "express";
 import Message from "../models/Message.js";
 import { auth } from "../middleware/auth.js";
+import upload from "../middleware/upload.js";
 import mongoose from "mongoose";
 
 const router = express.Router();
 
+// Send text message
 router.post("/", auth, async (req, res) => {
   try {
     const { receiverId, content } = req.body;
 
-    if (!content.trim()) {
+    if (!content || !content.trim()) {
       return res.status(400).json({ message: "Message cannot be empty" });
     }
 
@@ -17,6 +19,7 @@ router.post("/", auth, async (req, res) => {
       sender: req.user._id,
       receiver: receiverId,
       content,
+      messageType: "text",
     });
 
     await message.save();
@@ -29,6 +32,37 @@ router.post("/", auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// Send image message
+router.post("/image", auth, upload.single("image"), async (req, res) => {
+  try {
+    const { receiverId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No image provided" });
+    }
+
+    const imageUrl = `/uploads/${req.file.filename}`;
+
+    const message = new Message({
+      sender: req.user._id,
+      receiver: receiverId,
+      content: "",
+      messageType: "image",
+      imageUrl: imageUrl,
+    });
+
+    await message.save();
+    await message.populate("sender", "username avatar");
+    await message.populate("receiver", "username avatar");
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Send image message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 router.get("/:userId", auth, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -40,12 +74,12 @@ router.get("/:userId", auth, async (req, res) => {
       currentUserId,
       userId,
       limit,
-      skip
+      skip,
     );
 
     await Message.updateMany(
       { sender: userId, receiver: currentUserId, isRead: false },
-      { isRead: true, readAt: Date.now() }
+      { isRead: true, readAt: Date.now() },
     );
 
     res.json(messages.reverse());
@@ -71,7 +105,7 @@ router.put("/read/:userId", auth, async (req, res) => {
 
     const result = await Message.updateMany(
       { sender: userId, receiver: req.user._id, isRead: false },
-      { isRead: true, readAt: Date.now() }
+      { isRead: true, readAt: Date.now() },
     );
 
     res.json({ updated: result.nModified });

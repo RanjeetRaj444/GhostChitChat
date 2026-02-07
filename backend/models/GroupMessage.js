@@ -1,0 +1,84 @@
+import mongoose from "mongoose";
+
+const groupMessageSchema = new mongoose.Schema(
+  {
+    group: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
+      required: true,
+    },
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ChatUser",
+      required: true,
+    },
+    content: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    messageType: {
+      type: String,
+      enum: ["text", "image"],
+      default: "text",
+    },
+    imageUrl: {
+      type: String,
+      default: null,
+    },
+    readBy: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "ChatUser",
+        },
+        readAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  },
+);
+
+groupMessageSchema.index({ group: 1, createdAt: -1 });
+groupMessageSchema.index({ sender: 1 });
+
+// Get messages for a group with pagination
+groupMessageSchema.statics.getGroupMessages = async function (
+  groupId,
+  limit = 50,
+  skip = 0,
+) {
+  return this.find({ group: groupId })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate("sender", "username avatar")
+    .lean();
+};
+
+// Mark messages as read by a user
+groupMessageSchema.statics.markAsRead = async function (groupId, userId) {
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+
+  return this.updateMany(
+    {
+      group: groupId,
+      sender: { $ne: userObjectId },
+      "readBy.user": { $ne: userObjectId },
+    },
+    {
+      $push: {
+        readBy: { user: userObjectId, readAt: new Date() },
+      },
+    },
+  );
+};
+
+const GroupMessage = mongoose.model("GroupMessage", groupMessageSchema);
+
+export default GroupMessage;

@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import messageRoutes from "./routes/messages.js";
+import groupRoutes from "./routes/groups.js";
+import groupMessageRoutes from "./routes/groupMessages.js";
 import { socketHandler } from "./socketHandler.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -46,9 +48,14 @@ app.use(
 );
 app.use(express.json());
 
+// Serve uploaded images
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/groups", groupRoutes);
+app.use("/api/group-messages", groupMessageRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
