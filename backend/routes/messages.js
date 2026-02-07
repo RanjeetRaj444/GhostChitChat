@@ -387,4 +387,37 @@ router.delete("/clear/:userId", auth, async (req, res) => {
   }
 });
 
+// Toggle star status of a message
+router.post("/:messageId/star", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const currentUserId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    const isStarred = message.starredBy.includes(currentUserId);
+
+    if (isStarred) {
+      message.starredBy = message.starredBy.filter(
+        (id) => id.toString() !== currentUserId.toString(),
+      );
+    } else {
+      message.starredBy.push(currentUserId);
+    }
+
+    await message.save();
+    res.json({
+      success: true,
+      isStarred: !isStarred,
+      starredBy: message.starredBy,
+    });
+  } catch (error) {
+    console.error("Star message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;

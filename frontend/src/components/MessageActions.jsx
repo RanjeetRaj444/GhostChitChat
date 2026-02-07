@@ -7,6 +7,7 @@ import {
   FaEdit,
   FaCopy,
   FaEllipsisH,
+  FaStar,
 } from "react-icons/fa";
 
 // Quick reaction emojis
@@ -22,6 +23,7 @@ function MessageActions({
   onDeleteForEveryone,
   onEdit,
   onCopy,
+  onToggleStar,
   canEdit,
   canDeleteForEveryone,
 }) {
@@ -29,6 +31,10 @@ function MessageActions({
   const [showReactions, setShowReactions] = useState(false);
   const [menuPlacement, setMenuPlacement] = useState("bottom"); // 'top' or 'bottom'
   const menuRef = useRef(null);
+
+  const isStarred = message.starredBy?.some(
+    (id) => (id._id || id).toString() === currentUserId.toString(),
+  );
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -48,6 +54,11 @@ function MessageActions({
       navigator.clipboard.writeText(message.content);
       onCopy?.();
     }
+    setShowMenu(false);
+  };
+
+  const handleStar = () => {
+    onToggleStar?.(message._id);
     setShowMenu(false);
   };
 
@@ -225,6 +236,17 @@ function MessageActions({
             >
               <FaReply className="w-3.5 h-3.5" />
               Reply
+            </button>
+
+            {/* Star */}
+            <button
+              onClick={handleStar}
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+            >
+              <FaStar
+                className={`w-3.5 h-3.5 ${isStarred ? "text-yellow-500" : ""}`}
+              />
+              {isStarred ? "Unstar" : "Star"}
             </button>
 
             {/* Edit (only for sender, text messages, within time limit) */}

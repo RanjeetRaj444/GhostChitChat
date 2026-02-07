@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaTimes, FaImage, FaArrowDown } from "react-icons/fa";
+import { FaTimes, FaImage, FaArrowDown, FaStar } from "react-icons/fa";
 import MessageActions from "./MessageActions";
 import ReplyPreview from "./ReplyPreview";
 import ReactionDetails from "./ReactionDetails";
@@ -18,6 +18,7 @@ function ChatWindow({
   onDeleteForMe,
   onDeleteForEveryone,
   onEdit,
+  onToggleStar,
   searchQuery = "",
 }) {
   const endRef = useRef(null);
@@ -296,6 +297,8 @@ function ChatWindow({
                                 }
                                 onDeleteForMe={onDeleteForMe}
                                 onDeleteForEveryone={onDeleteForEveryone}
+                                onDeleteStar={onToggleStar}
+                                onToggleStar={(mid) => onToggleStar?.(mid)}
                                 onEdit={onEdit}
                                 onCopy={handleCopy}
                                 canEdit={canEditMessage(message)}
@@ -360,6 +363,40 @@ function ChatWindow({
                                     <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                                   </div>
                                 )}
+
+                                {/* Image Metadata Overlay */}
+                                <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-lg border border-white/10">
+                                  {message.starredBy?.some(
+                                    (id) =>
+                                      (id._id || id).toString() ===
+                                      currentUser?._id.toString(),
+                                  ) && (
+                                    <FaStar className="w-2.5 h-2.5 text-yellow-400" />
+                                  )}
+                                  <span className="text-[10px] font-bold text-white/90 leading-none">
+                                    {formatMessageTime(message.createdAt)}
+                                  </span>
+                                  {isSentByCurrentUser && (
+                                    <div className="flex items-center h-3">
+                                      {message.isSending ? (
+                                        <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                      ) : (
+                                        <div className="flex -space-x-1">
+                                          <span
+                                            className={`text-[10px] font-black ${message.isRead ? "text-primary-400" : "text-white/60"}`}
+                                          >
+                                            ✓
+                                          </span>
+                                          {message.isRead && (
+                                            <span className="text-[10px] font-black text-primary-400">
+                                              ✓
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </motion.div>
                             ) : (
                               <motion.div
@@ -370,12 +407,53 @@ function ChatWindow({
                                     : "message-received rounded-bl-none"
                                 } ${message.replyTo ? "rounded-t-none" : ""}`}
                               >
-                                {highlightText(message.content, searchQuery)}
-                                {message.isEdited && (
-                                  <span className="ml-2 text-[10px] opacity-60">
-                                    (edited)
+                                <div className="pr-4 pb-2">
+                                  {highlightText(message.content, searchQuery)}
+                                  {message.isEdited && (
+                                    <span className="ml-2 text-[10px] opacity-60">
+                                      (edited)
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div
+                                  className={`absolute bottom-1 right-2 flex items-center gap-1.5`}
+                                >
+                                  {message.starredBy?.some(
+                                    (id) =>
+                                      (id._id || id).toString() ===
+                                      currentUser?._id.toString(),
+                                  ) && (
+                                    <FaStar className="w-2.5 h-2.5 text-yellow-400 drop-shadow-sm" />
+                                  )}
+                                  <span
+                                    className={`text-[10px] font-bold leading-none ${isSentByCurrentUser ? "text-primary-100/90" : "text-neutral-400"}`}
+                                  >
+                                    {formatMessageTime(message.createdAt)}
                                   </span>
-                                )}
+                                  {isSentByCurrentUser && (
+                                    <div className="flex items-center h-3">
+                                      {message.isSending ? (
+                                        <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                      ) : (
+                                        <div className="flex -space-x-1">
+                                          <span
+                                            className={`text-[10px] font-black ${message.isRead ? (isSentByCurrentUser ? "text-primary-200" : "text-primary-500") : "text-white/60"}`}
+                                          >
+                                            ✓
+                                          </span>
+                                          {message.isRead && (
+                                            <span
+                                              className={`text-[10px] font-black ${isSentByCurrentUser ? "text-primary-200" : "text-primary-500"}`}
+                                            >
+                                              ✓
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </motion.div>
                             )}
                           </div>
@@ -393,6 +471,7 @@ function ChatWindow({
                                 }
                                 onDeleteForMe={onDeleteForMe}
                                 onDeleteForEveryone={onDeleteForEveryone}
+                                onToggleStar={(mid) => onToggleStar?.(mid)}
                                 onEdit={onEdit}
                                 onCopy={handleCopy}
                                 canEdit={canEditMessage(message)}
@@ -402,7 +481,6 @@ function ChatWindow({
                               />
                             )}
                         </div>
-
                         {/* Reactions display */}
                         {reactions.length > 0 && !isDeleted && (
                           <div
@@ -436,76 +514,12 @@ function ChatWindow({
                                   onClose={() => setShowReactionDetails(null)}
                                   onRemoveReaction={(mid, emoji, target) => {
                                     onReact?.(mid, emoji, target);
-                                    // If no more reactions after this, the component will unmount
                                   }}
                                 />
                               )}
                             </AnimatePresence>
                           </div>
                         )}
-
-                        {/* Time and status */}
-                        <div
-                          className={`flex items-center text-xs mt-1 px-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity duration-200 ${
-                            isSentByCurrentUser
-                              ? "justify-end"
-                              : "justify-start"
-                          }`}
-                        >
-                          <span className="text-neutral-500 dark:text-neutral-400">
-                            {formatMessageTime(message.createdAt)}
-                          </span>
-
-                          {isSentByCurrentUser && (
-                            <span className="ml-1 h-3 flex items-center">
-                              {message.isSending ? (
-                                <svg
-                                  className="w-3 h-3 text-neutral-400 animate-spin"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <circle
-                                    className="opacity-25"
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth="4"
-                                  ></circle>
-                                  <path
-                                    className="opacity-75"
-                                    fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                  ></path>
-                                </svg>
-                              ) : message.failed ? (
-                                <span
-                                  className="text-error-500 font-bold"
-                                  title="Failed to send"
-                                >
-                                  !
-                                </span>
-                              ) : (
-                                <div className="flex items-center ml-1">
-                                  {message.isRead ? (
-                                    <div className="flex -space-x-1.5">
-                                      <span className="text-[10px] font-black text-primary-500">
-                                        ✓
-                                      </span>
-                                      <span className="text-[10px] font-black text-primary-500">
-                                        ✓
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] font-black text-neutral-400">
-                                      ✓
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </span>
-                          )}
-                        </div>
                       </div>
 
                       {isSentByCurrentUser && (

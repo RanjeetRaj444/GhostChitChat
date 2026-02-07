@@ -15,7 +15,9 @@ import {
   FaTrash,
   FaEraser,
   FaFlag,
+  FaSignOutAlt,
 } from "react-icons/fa";
+import toast from "react-hot-toast";
 import { useRef, useEffect } from "react";
 
 function GroupChatHeader({
@@ -262,7 +264,13 @@ function GroupChatHeader({
                       Close chat
                     </button>
 
-                    <button className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        toast.success("Group reported");
+                      }}
+                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                    >
                       <FaFlag className="w-3.5 h-3.5 mr-3 opacity-70" />
                       Report Group
                     </button>

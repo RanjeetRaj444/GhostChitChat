@@ -97,7 +97,7 @@ function Sidebar({
       {/* Header */}
       <div className="p-4 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
         <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-500 dark:to-secondary-500">
-          ChitChat
+         G-ChitChat
         </h1>
 
         <div className="flex space-x-1">

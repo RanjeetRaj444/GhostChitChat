@@ -82,7 +82,7 @@ function RegisterPage() {
       <div className="w-full max-w-md space-y-8 bg-white dark:bg-neutral-800 p-8 rounded-xl shadow-chat dark:shadow-chat-dark animate-fade-in">
         <div>
           <h1 className="text-center text-3xl font-bold text-primary-600 dark:text-primary-500">
-            ChitChat
+          G-ChitChat
           </h1>
           <h2 className="mt-2 text-center text-xl font-semibold text-neutral-900 dark:text-neutral-100">
             Create a new account

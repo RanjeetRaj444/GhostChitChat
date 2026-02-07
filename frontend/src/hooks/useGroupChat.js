@@ -655,6 +655,25 @@ export const useGroupChat = () => {
     }
   };
 
+  const toggleGroupStar = async (messageId) => {
+    try {
+      const res = await api.post(`/group-messages/${messageId}/star`);
+      setGroupMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageId ? { ...m, starredBy: res.data.starredBy } : m,
+        ),
+      );
+      toast.success(
+        res.data.isStarred ? "Message starred" : "Message unstarred",
+      );
+      return true;
+    } catch (err) {
+      console.error("Star message error:", err);
+      toast.error("Failed to star message");
+      return false;
+    }
+  };
+
   // Clear group chat history
   const clearGroupChat = async (groupId, keepStarred = false) => {
     if (!api) return false;
@@ -756,5 +775,6 @@ export const useGroupChat = () => {
     clearGroupChat,
     muteGroup,
     toggleGroupFavorite,
+    toggleGroupStar,
   };
 };

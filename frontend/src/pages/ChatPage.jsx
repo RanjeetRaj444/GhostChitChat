@@ -63,6 +63,7 @@ function ChatPage() {
     clearChat,
     muteUser,
     toggleFavorite,
+    toggleStar,
   } = useChat();
 
   // Group chat hooks
@@ -91,6 +92,7 @@ function ChatPage() {
     clearGroupChat,
     muteGroup,
     toggleGroupFavorite,
+    toggleGroupStar,
   } = useGroupChat();
 
   const handleTyping = (isTyping) => {
@@ -367,6 +369,7 @@ function ChatPage() {
                   onDeleteForMe={handleDeleteForMe}
                   onDeleteForEveryone={handleDeleteForEveryone}
                   onEdit={handleEdit}
+                  onToggleStar={selectedGroup ? toggleGroupStar : toggleStar}
                   searchQuery={chatSearchQuery}
                 />
 
@@ -444,7 +447,7 @@ function ChatPage() {
                   >
                     Welcome to{" "}
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-400 dark:to-secondary-400">
-                      ChitChat
+                     G-ChitChat
                     </span>
                   </motion.h1>
 

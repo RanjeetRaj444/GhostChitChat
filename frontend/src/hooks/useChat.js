@@ -649,6 +649,25 @@ export const useChat = () => {
     }
   };
 
+  const toggleStar = async (messageId) => {
+    try {
+      const res = await api.post(`/messages/${messageId}/star`);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageId ? { ...m, starredBy: res.data.starredBy } : m,
+        ),
+      );
+      toast.success(
+        res.data.isStarred ? "Message starred" : "Message unstarred",
+      );
+      return true;
+    } catch (err) {
+      console.error("Star message error:", err);
+      toast.error("Failed to star message");
+      return false;
+    }
+  };
+
   const clearChat = async (userId, keepStarred = false) => {
     try {
       await api.delete(`/messages/clear/${userId}?keepStarred=${keepStarred}`);
@@ -703,5 +722,6 @@ export const useChat = () => {
     clearChat,
     muteUser,
     toggleFavorite,
+    toggleStar,
   };
 };

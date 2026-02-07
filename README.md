@@ -1,6 +1,6 @@
-# ChitChat - Real-time Chat Application
+# G-ChitChat - Real-time Chat Application
 
-A modern, feature-rich chat application built with React, Node.js, and MongoDB. ChitChat offers a seamless real-time messaging experience with a beautiful, responsive interface.
+A modern, feature-rich chat application built with React, Node.js, and MongoDB. G-ChitChat offers a seamless real-time messaging experience with a beautiful, responsive interface.
 
 ![alt text](<frontend/src/assets/Screenshot 2025-06-05 144344.png>)
 
