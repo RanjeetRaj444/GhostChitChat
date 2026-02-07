@@ -255,7 +255,11 @@ function Sidebar({
                                 {conversation.user.username}
                               </h3>
                               <span className="text-[10px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-1 font-bold">
-                                {formatTime(conversation.lastMessage.createdAt)}
+                                {conversation.lastMessage
+                                  ? formatTime(
+                                      conversation.lastMessage.createdAt,
+                                    )
+                                  : ""}
                               </span>
                             </div>
 
@@ -272,13 +276,21 @@ function Sidebar({
                                       : "text-neutral-500 dark:text-neutral-500"
                                   }`}
                                 >
-                                  {conversation.lastMessage.sender ===
-                                  currentUser._id ? (
-                                    <span className="text-primary-500 mr-1 opacity-70">
-                                      You:
+                                  {conversation.lastMessage ? (
+                                    <>
+                                      {conversation.lastMessage.sender ===
+                                      currentUser._id ? (
+                                        <span className="text-primary-500 mr-1 opacity-70">
+                                          You:
+                                        </span>
+                                      ) : null}
+                                      {conversation.lastMessage.content}
+                                    </>
+                                  ) : (
+                                    <span className="italic opacity-60">
+                                      No messages yet
                                     </span>
-                                  ) : null}
-                                  {conversation.lastMessage.content}
+                                  )}
                                 </p>
                               )}
 

@@ -570,5 +570,6 @@ export const useChat = () => {
     setEditingMessage,
     setConversations,
     setMessages,
+    refreshConversations: fetchInitialData,
   };
 };

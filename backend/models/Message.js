@@ -121,7 +121,15 @@ messageSchema.statics.getConversation = async function (
 };
 
 messageSchema.statics.getUserConversations = async function (userId) {
+  const userModel = mongoose.model("ChatUser");
+  const userCollectionName = userModel.collection.name || "chatusers";
+
+  // 1. Get user's contacts first
+  const user = await userModel.findById(userId).select("contacts");
+  const contactIds = user?.contacts || [];
+
   const conversations = await this.aggregate([
+    // Match messages for the user
     {
       $match: {
         $or: [
@@ -158,30 +166,76 @@ messageSchema.statics.getUserConversations = async function (userId) {
         },
       },
     },
+    // Union with contacts who might not have messages
     {
-      $lookup: {
-        from: "users",
-        localField: "_id",
-        foreignField: "_id",
-        as: "user",
+      $unionWith: {
+        coll: userCollectionName,
+        pipeline: [
+          {
+            $match: {
+              _id: { $in: contactIds },
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              user: {
+                _id: "$_id",
+                username: "$username",
+                avatar: "$avatar",
+                isOnline: "$isOnline",
+                lastSeen: "$lastSeen",
+              },
+              lastMessage: { $literal: null },
+              unreadCount: { $literal: 0 },
+            },
+          },
+        ],
       },
     },
-    { $unwind: "$user" },
+    // Sort to ensure real messages come before null entries from contacts union
+    {
+      $sort: { "lastMessage.createdAt": -1 },
+    },
+    // Group again by _id to merge contacts with their messages if they exist
+    {
+      $group: {
+        _id: "$_id",
+        unionUser: { $first: "$user" },
+        lastMessage: { $first: "$lastMessage" },
+        unreadCount: { $first: "$unreadCount" },
+      },
+    },
+    {
+      $lookup: {
+        from: userCollectionName,
+        localField: "_id",
+        foreignField: "_id",
+        as: "lookedUpUser",
+      },
+    },
+    { $unwind: { path: "$lookedUpUser", preserveNullAndEmptyArrays: true } },
     {
       $project: {
         _id: 1,
         user: {
-          _id: 1,
-          username: 1,
-          avatar: 1,
-          isOnline: 1,
-          lastSeen: 1,
+          _id: { $ifNull: ["$unionUser._id", "$lookedUpUser._id"] },
+          username: {
+            $ifNull: ["$unionUser.username", "$lookedUpUser.username"],
+          },
+          avatar: { $ifNull: ["$unionUser.avatar", "$lookedUpUser.avatar"] },
+          isOnline: {
+            $ifNull: ["$unionUser.isOnline", "$lookedUpUser.isOnline"],
+          },
+          lastSeen: {
+            $ifNull: ["$unionUser.lastSeen", "$lookedUpUser.lastSeen"],
+          },
         },
         lastMessage: 1,
         unreadCount: 1,
       },
     },
-    { $sort: { "lastMessage.createdAt": -1 } },
+    { $sort: { "lastMessage.createdAt": -1, "user.username": 1 } },
   ]);
 
   return conversations;

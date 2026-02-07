@@ -24,6 +24,11 @@ router.post("/", auth, async (req, res) => {
     });
 
     await message.save();
+
+    // Automatically add to contacts
+    await mongoose.model("ChatUser").findByIdAndUpdate(req.user._id, {
+      $addToSet: { contacts: receiverId },
+    });
     await message.populate("sender", "username avatar");
     await message.populate("receiver", "username avatar");
     if (replyToId) {
@@ -62,6 +67,11 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
     });
 
     await message.save();
+
+    // Automatically add to contacts
+    await mongoose.model("ChatUser").findByIdAndUpdate(req.user._id, {
+      $addToSet: { contacts: receiverId },
+    });
     await message.populate("sender", "username avatar");
     await message.populate("receiver", "username avatar");
     if (replyToId) {

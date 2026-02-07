@@ -54,10 +54,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    contacts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ChatUser",
+      },
+    ],
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Pre-save hook to hash password

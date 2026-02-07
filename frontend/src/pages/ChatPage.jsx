@@ -28,7 +28,7 @@ function ChatPage() {
     getGroupTypingUsers,
     sendGroupTypingStatus,
   } = useSocket();
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, api } = useAuth();
   const { darkMode, toggleTheme } = useTheme();
 
   // Private chat hooks
@@ -49,6 +49,8 @@ function ChatPage() {
     setReplyTo,
     editingMessage,
     setEditingMessage,
+    setMessages,
+    refreshConversations,
   } = useChat();
 
   // Group chat hooks
@@ -173,9 +175,21 @@ function ChatPage() {
     toast.success("Logged out successfully");
   };
 
-  const handleSelectUser = (user) => {
+  const handleSelectUser = async (user) => {
     setSelectedGroup(null);
     setSelectedUser(user);
+
+    // Add to contacts when selecting a user (connecting)
+    try {
+      if (user && user._id) {
+        await api.post(`/users/contacts/${user._id}`);
+        // Refresh conversations to show the newly added contact
+        refreshConversations();
+      }
+    } catch (err) {
+      console.error("Failed to add to contacts:", err);
+    }
+
     // Clear reply/edit state
     setReplyTo(null);
     setEditingMessage(null);

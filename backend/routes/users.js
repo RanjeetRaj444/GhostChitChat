@@ -62,4 +62,60 @@ router.put("/profile", auth, async (req, res) => {
   }
 });
 
+// Add user to contacts
+router.post("/contacts/:id", auth, async (req, res) => {
+  try {
+    const contactId = req.params.id;
+    if (contactId === req.user._id.toString()) {
+      return res
+        .status(400)
+        .json({ message: "Cannot add yourself to contacts" });
+    }
+
+    const contactUser = await User.findById(contactId);
+    if (!contactUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!req.user.contacts.includes(contactId)) {
+      req.user.contacts.push(contactId);
+      await req.user.save();
+    }
+
+    res.json({ success: true, contacts: req.user.contacts });
+  } catch (error) {
+    console.error("Add contact error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Remove user from contacts
+router.delete("/contacts/:id", auth, async (req, res) => {
+  try {
+    const contactId = req.params.id;
+    req.user.contacts = req.user.contacts.filter(
+      (id) => id.toString() !== contactId,
+    );
+    await req.user.save();
+    res.json({ success: true, contacts: req.user.contacts });
+  } catch (error) {
+    console.error("Remove contact error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get all contacts
+router.get("/contacts/all", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate(
+      "contacts",
+      "username avatar isOnline lastSeen bio",
+    );
+    res.json(user.contacts);
+  } catch (error) {
+    console.error("Get contacts error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;
