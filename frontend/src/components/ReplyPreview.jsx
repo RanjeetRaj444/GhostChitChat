@@ -11,7 +11,10 @@ function ReplyPreview({ replyTo, onCancel, isInMessage = false }) {
   // Style for when it's shown inside a message bubble
   if (isInMessage) {
     return (
-      <div className="mb-2 pl-3 border-l-2 border-primary-400 dark:border-primary-500 opacity-80">
+      <div
+        className="mb-2 pl-3 border-l-2 border-primary-400 dark:border-primary-500 opacity-80 cursor-pointer hover:opacity-100 transition-opacity"
+        onClick={onCancel} // We reuse the onCancel prop for click handler whenisInMessage is true
+      >
         <p className="text-xs font-semibold text-primary-600 dark:text-primary-400">
           {senderName}
         </p>

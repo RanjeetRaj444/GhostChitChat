@@ -67,4 +67,19 @@
   .glass-card {
     @apply bg-white/80 dark:bg-neutral-800/80 backdrop-blur-xl border border-white/20 dark:border-white/5;
   }
+
+  .highlight-message {
+    animation: highlight-pulse 2s ease-in-out;
+  }
+
+  @keyframes highlight-pulse {
+    0%,
+    100% {
+      background-color: transparent;
+    }
+    30%,
+    70% {
+      @apply bg-primary-500/20 dark:bg-primary-500/30;
+    }
+  }
 }

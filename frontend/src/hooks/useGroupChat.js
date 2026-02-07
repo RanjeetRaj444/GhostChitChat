@@ -282,7 +282,10 @@ export const useGroupChat = () => {
         ),
       );
 
-      sendSocketGroupMessage(selectedGroup._id, content, res.data._id);
+      sendSocketGroupMessage(selectedGroup._id, content, res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "text",
+      });
     } catch (err) {
       console.error("Send group message error:", err);
       setGroupMessages((prev) =>
@@ -345,7 +348,11 @@ export const useGroupChat = () => {
         ),
       );
 
-      sendSocketGroupMessage(selectedGroup._id, "📷 Image", res.data._id);
+      sendSocketGroupMessage(selectedGroup._id, "📷 Image", res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "image",
+        imageUrl: res.data.imageUrl,
+      });
     } catch (err) {
       console.error("Send group image error:", err);
       URL.revokeObjectURL(localImageUrl);

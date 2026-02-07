@@ -305,7 +305,10 @@ export const useChat = () => {
       );
 
       // Send socket message
-      sendSocketMessage(selectedUser._id, content, res.data._id);
+      sendSocketMessage(selectedUser._id, content, res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "text",
+      });
       updateConversationList(selectedUser._id, content);
     } catch (err) {
       console.error("Send message error:", err);
@@ -376,7 +379,11 @@ export const useChat = () => {
       );
 
       updateConversationList(selectedUser._id, "📷 Image");
-      sendSocketMessage(selectedUser._id, "📷 Image", res.data._id);
+      sendSocketMessage(selectedUser._id, "📷 Image", res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "image",
+        imageUrl: res.data.imageUrl,
+      });
     } catch (err) {
       console.error("Send image error:", err);
       URL.revokeObjectURL(localImageUrl);

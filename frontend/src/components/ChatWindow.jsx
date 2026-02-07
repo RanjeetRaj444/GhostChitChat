@@ -105,6 +105,20 @@ function ChatWindow({
     toast.success("Copied to clipboard");
   };
 
+  const scrollToMessage = (messageId) => {
+    const element = document.getElementById(`message-${messageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Add a brief highlight effect
+      element.classList.add("highlight-message");
+      setTimeout(() => {
+        element.classList.remove("highlight-message");
+      }, 2000);
+    } else {
+      toast.error("Original message not found");
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-4 bg-neutral-100 dark:bg-neutral-900 scroll-smooth">
       {loading ? (
@@ -160,6 +174,7 @@ function ChatWindow({
 
                   return (
                     <motion.div
+                      id={`message-${message._id}`}
                       key={message._id || message.createdAt + idx}
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -231,6 +246,11 @@ function ChatWindow({
                                 <ReplyPreview
                                   replyTo={message.replyTo}
                                   isInMessage={true}
+                                  onCancel={() =>
+                                    scrollToMessage(
+                                      message.replyTo._id || message.replyTo,
+                                    )
+                                  }
                                 />
                               </div>
                             )}

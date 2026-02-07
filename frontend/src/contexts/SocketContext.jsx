@@ -129,7 +129,7 @@ export function SocketProvider({ children }) {
   );
 
   const sendMessage = useCallback(
-    (receiverId, message, messageId) => {
+    (receiverId, message, messageId, extraData = {}) => {
       if (socketRef.current && currentUser) {
         socketRef.current.emit("private_message", {
           senderId: currentUser._id,
@@ -141,6 +141,7 @@ export function SocketProvider({ children }) {
             username: currentUser.username,
             avatar: currentUser.avatar,
           },
+          ...extraData,
         });
       }
     },
@@ -176,7 +177,7 @@ export function SocketProvider({ children }) {
   }, []);
 
   const sendGroupMessage = useCallback(
-    (groupId, message, messageId) => {
+    (groupId, message, messageId, extraData = {}) => {
       if (socketRef.current && currentUser) {
         socketRef.current.emit("group_message", {
           groupId,
@@ -188,6 +189,7 @@ export function SocketProvider({ children }) {
             username: currentUser.username,
             avatar: currentUser.avatar,
           },
+          ...extraData,
         });
       }
     },
