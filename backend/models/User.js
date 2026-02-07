@@ -66,6 +66,30 @@ const userSchema = new mongoose.Schema(
         ref: "ChatUser",
       },
     ],
+    mutedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ChatUser",
+      },
+    ],
+    favoriteUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ChatUser",
+      },
+    ],
+    mutedGroups: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Group",
+      },
+    ],
+    favoriteGroups: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Group",
+      },
+    ],
   },
   {
     timestamps: true,

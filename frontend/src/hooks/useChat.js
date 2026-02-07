@@ -13,7 +13,7 @@ export const useChat = () => {
   const [editingMessage, setEditingMessage] = useState(null);
 
   const { socket, markRead, sendMessage: sendSocketMessage } = useSocket();
-  const { api, currentUser } = useAuth();
+  const { api, currentUser, setCurrentUser } = useAuth();
 
   const selectedUserRef = useRef(selectedUser);
   const messagesRef = useRef(messages);
@@ -613,6 +613,70 @@ export const useChat = () => {
     }
   };
 
+  const muteUser = async (userId) => {
+    try {
+      const res = await api.post(`/users/mute/${userId}`, { type: "user" });
+      setCurrentUser((prev) => ({
+        ...prev,
+        mutedUsers: res.data.mutedUsers,
+      }));
+      toast.success(
+        res.data.isMuted ? "Notifications muted" : "Notifications unmuted",
+      );
+      return true;
+    } catch (err) {
+      console.error("Mute user error:", err);
+      toast.error("Failed to update mute status");
+      return false;
+    }
+  };
+
+  const toggleFavorite = async (userId) => {
+    try {
+      const res = await api.post(`/users/favorite/${userId}`, { type: "user" });
+      setCurrentUser((prev) => ({
+        ...prev,
+        favoriteUsers: res.data.favoriteUsers,
+      }));
+      toast.success(
+        res.data.isFavorite ? "Added to favorites" : "Removed from favorites",
+      );
+      return true;
+    } catch (err) {
+      console.error("Favorite user error:", err);
+      toast.error("Failed to update favorite status");
+      return false;
+    }
+  };
+
+  const clearChat = async (userId, keepStarred = false) => {
+    try {
+      await api.delete(`/messages/clear/${userId}?keepStarred=${keepStarred}`);
+      if (selectedUserRef.current?._id === userId && !keepStarred) {
+        setMessages([]);
+      } else if (selectedUserRef.current?._id === userId && keepStarred) {
+        // Optimistically filter locally if keepStarred is true
+        setMessages((prev) =>
+          prev.filter((m) => m.starredBy?.includes(currentUser._id)),
+        );
+      }
+      // Update sidebar last message if not keeping starred or if no starred exist
+      if (!keepStarred) {
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.user?._id === userId ? { ...c, lastMessage: null } : c,
+          ),
+        );
+      }
+      toast.success("Chat cleared");
+      return true;
+    } catch (err) {
+      console.error("Clear chat error:", err);
+      toast.error("Failed to clear chat");
+      return false;
+    }
+  };
+
   return {
     conversations,
     users,
@@ -636,5 +700,8 @@ export const useChat = () => {
     removeContact,
     blockUser,
     unblockUser,
+    clearChat,
+    muteUser,
+    toggleFavorite,
   };
 };

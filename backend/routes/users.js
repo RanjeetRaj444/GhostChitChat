@@ -173,4 +173,78 @@ router.post("/unblock/:id", auth, async (req, res) => {
   }
 });
 
+// Mute/Unmute user or group
+router.post("/mute/:id", auth, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const { type } = req.body; // 'user' or 'group'
+    const field = type === "group" ? "mutedGroups" : "mutedUsers";
+    const isMuted = req.user[field].includes(targetId);
+
+    if (isMuted) {
+      req.user[field] = req.user[field].filter(
+        (id) => id.toString() !== targetId,
+      );
+    } else {
+      req.user[field].push(targetId);
+    }
+
+    await req.user.save();
+    res.json({
+      success: true,
+      [field]: req.user[field],
+      isMuted: !isMuted,
+    });
+  } catch (error) {
+    console.error("Mute error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Favorite/Unfavorite user or group
+router.post("/favorite/:id", auth, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const { type } = req.body; // 'user' or 'group'
+    const field = type === "group" ? "favoriteGroups" : "favoriteUsers";
+    const isFavorite = req.user[field].includes(targetId);
+
+    if (isFavorite) {
+      req.user[field] = req.user[field].filter(
+        (id) => id.toString() !== targetId,
+      );
+    } else {
+      req.user[field].push(targetId);
+    }
+
+    await req.user.save();
+    res.json({
+      success: true,
+      [field]: req.user[field],
+      isFavorite: !isFavorite,
+    });
+  } catch (error) {
+    console.error("Favorite error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Report user
+router.post("/report/:id", auth, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const { reason } = req.body;
+
+    // In a real app, you would save this to a Reports collection
+    console.log(
+      `[REPORT] User ${req.user._id} reported ${targetId}. Reason: ${reason || "No reason provided"}`,
+    );
+
+    res.json({ success: true, message: "Report received" });
+  } catch (error) {
+    console.error("Report user error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;

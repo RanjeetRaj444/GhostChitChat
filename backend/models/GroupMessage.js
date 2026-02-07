@@ -86,6 +86,12 @@ const groupMessageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    starredBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ChatUser",
+      },
+    ],
   },
   {
     timestamps: true,

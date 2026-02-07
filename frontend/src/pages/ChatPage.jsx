@@ -13,6 +13,7 @@ import CreateGroupModal from "../components/CreateGroupModal";
 import GroupChatHeader from "../components/GroupChatHeader";
 import GroupInfoModal from "../components/GroupInfoModal";
 import ConfirmationModal from "../components/ConfirmationModal";
+import ClearChatModal from "../components/ClearChatModal";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 
@@ -23,6 +24,8 @@ function ChatPage() {
   const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [contactToDelete, setContactToDelete] = useState(null);
   const [isDeletingContact, setIsDeletingContact] = useState(false);
+  const [clearingTarget, setClearingTarget] = useState(null); // { id: string, type: 'private' | 'group' }
+  const [isClearingChat, setIsClearingChat] = useState(false);
 
   const {
     isUserOnline,
@@ -57,6 +60,9 @@ function ChatPage() {
     removeContact,
     blockUser,
     unblockUser,
+    clearChat,
+    muteUser,
+    toggleFavorite,
   } = useChat();
 
   // Group chat hooks
@@ -82,6 +88,9 @@ function ChatPage() {
     leaveGroup,
     deleteGroup,
     updateGroup,
+    clearGroupChat,
+    muteGroup,
+    toggleGroupFavorite,
   } = useGroupChat();
 
   const handleTyping = (isTyping) => {
@@ -228,6 +237,28 @@ function ChatPage() {
     }
   };
 
+  const handleClearChat = async (keepStarred) => {
+    if (!clearingTarget) return;
+
+    setIsClearingChat(true);
+    try {
+      let success = false;
+      if (clearingTarget.type === "private") {
+        success = await clearChat(clearingTarget.id, keepStarred);
+      } else {
+        success = await clearGroupChat(clearingTarget.id, keepStarred);
+      }
+
+      if (success) {
+        setClearingTarget(null);
+      }
+    } catch (err) {
+      console.error("Clear chat error:", err);
+    } finally {
+      setIsClearingChat(false);
+    }
+  };
+
   // Count online members in a group
   const getOnlineCount = () => {
     if (!selectedGroup?.members) return 0;
@@ -299,6 +330,13 @@ function ChatPage() {
                     onSearch={setChatSearchQuery}
                     onBlock={blockUser}
                     onUnblock={unblockUser}
+                    onClearChat={(userId) =>
+                      setClearingTarget({ id: userId, type: "private" })
+                    }
+                    onDeleteChat={(user) => setContactToDelete(user)}
+                    onMute={muteUser}
+                    onFavorite={toggleFavorite}
+                    currentUser={currentUser}
                   />
                 ) : (
                   <GroupChatHeader
@@ -308,6 +346,13 @@ function ChatPage() {
                     onOpenInfo={() => setShowGroupInfoModal(true)}
                     onlineCount={getOnlineCount()}
                     onSearch={setChatSearchQuery}
+                    onClearChat={(groupId) =>
+                      setClearingTarget({ id: groupId, type: "group" })
+                    }
+                    onDeleteChat={deleteGroup}
+                    onMute={muteGroup}
+                    onFavorite={toggleGroupFavorite}
+                    currentUser={currentUser}
                   />
                 )}
 
@@ -464,6 +509,14 @@ function ChatPage() {
           cancelText="Cancel"
           isDanger={true}
           loading={isDeletingContact}
+        />
+
+        {/* Clear Chat Confirmation Modal */}
+        <ClearChatModal
+          isOpen={!!clearingTarget}
+          onClose={() => setClearingTarget(null)}
+          onConfirm={handleClearChat}
+          loading={isClearingChat}
         />
       </AnimatePresence>
     </div>

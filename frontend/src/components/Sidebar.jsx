@@ -14,6 +14,7 @@ import {
   FaEllipsisV,
   FaBan,
   FaUnlock,
+  FaBellSlash,
 } from "react-icons/fa";
 
 function Sidebar({
@@ -254,7 +255,7 @@ function Sidebar({
                             )}
                           </div>
 
-                          <div className="ml-4 flex-1 overflow-hidden pointer-events-none">
+                          <div className="ml-4 flex-1 overflow-hidden pointer-events-none pr-8">
                             <div className="flex justify-between items-baseline mb-1">
                               <h3
                                 className={`text-sm font-bold truncate ${
@@ -265,13 +266,20 @@ function Sidebar({
                               >
                                 {conversation.user.username}
                               </h3>
-                              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-1 font-bold">
-                                {conversation.lastMessage
-                                  ? formatTime(
-                                      conversation.lastMessage.createdAt,
-                                    )
-                                  : ""}
-                              </span>
+                              <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-1 font-bold">
+                                  {conversation.lastMessage
+                                    ? formatTime(
+                                        conversation.lastMessage.createdAt,
+                                      )
+                                    : ""}
+                                </span>
+                                {currentUser?.mutedUsers?.includes(
+                                  conversation.user._id,
+                                ) && (
+                                  <FaBellSlash className="w-2.5 h-2.5 text-neutral-400 mt-1" />
+                                )}
+                              </div>
                             </div>
 
                             <div className="flex items-center justify-between">
@@ -542,9 +550,18 @@ function Sidebar({
                                 {group.name}
                               </h3>
                               {group.lastMessage && (
-                                <span className="text-[10px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-1 font-bold">
-                                  {formatTime(group.lastMessage.createdAt)}
-                                </span>
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-1 font-bold">
+                                    {group.lastMessage
+                                      ? formatTime(group.lastMessage.createdAt)
+                                      : ""}
+                                  </span>
+                                  {currentUser?.mutedGroups?.includes(
+                                    group._id,
+                                  ) && (
+                                    <FaBellSlash className="w-2.5 h-2.5 text-neutral-400 mt-1" />
+                                  )}
+                                </div>
                               )}
                             </div>
 

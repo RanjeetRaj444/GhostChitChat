@@ -352,4 +352,39 @@ router.put("/:messageId/edit", auth, async (req, res) => {
   }
 });
 
+// Clear conversation history (delete for me only)
+router.delete("/clear/:userId", auth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { keepStarred } = req.query; // true/false
+    const currentUserId = req.user._id;
+
+    const query = {
+      $or: [
+        { sender: currentUserId, receiver: userId },
+        { sender: userId, receiver: currentUserId },
+      ],
+      deletedFor: { $ne: currentUserId },
+    };
+
+    if (keepStarred === "true") {
+      query.starredBy = { $ne: currentUserId };
+    }
+
+    // Update all messages in this conversation to include current user in deletedFor
+    const result = await Message.updateMany(query, {
+      $push: { deletedFor: currentUserId },
+    });
+
+    res.json({
+      success: true,
+      message: "Chat cleared",
+      count: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error("Clear chat error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;

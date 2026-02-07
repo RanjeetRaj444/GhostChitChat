@@ -356,4 +356,38 @@ router.put("/:messageId/edit", auth, async (req, res) => {
   }
 });
 
+// Clear group conversation history (delete for me only)
+router.delete("/clear/:groupId", auth, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { keepStarred } = req.query; // true/false
+    const currentUserId = req.user._id;
+
+    // Verify membership
+    const group = await Group.findById(groupId);
+    if (!group || !group.members.includes(currentUserId)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const query = { group: groupId, deletedFor: { $ne: currentUserId } };
+
+    if (keepStarred === "true") {
+      query.starredBy = { $ne: currentUserId };
+    }
+
+    const result = await GroupMessage.updateMany(query, {
+      $push: { deletedFor: currentUserId },
+    });
+
+    res.json({
+      success: true,
+      message: "Group chat cleared",
+      count: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error("Clear group chat error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;

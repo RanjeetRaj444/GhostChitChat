@@ -29,6 +29,10 @@ router.post("/register", async (req, res) => {
       username: user.username,
       email: user.email,
       avatar: user.avatar,
+      mutedUsers: user.mutedUsers || [],
+      favoriteUsers: user.favoriteUsers || [],
+      mutedGroups: user.mutedGroups || [],
+      favoriteGroups: user.favoriteGroups || [],
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -57,6 +61,10 @@ router.post("/login", async (req, res) => {
       username: user.username,
       email: user.email,
       avatar: user.avatar,
+      mutedUsers: user.mutedUsers || [],
+      favoriteUsers: user.favoriteUsers || [],
+      mutedGroups: user.mutedGroups || [],
+      favoriteGroups: user.favoriteGroups || [],
       token: generateToken(user._id),
     });
   } catch (error) {

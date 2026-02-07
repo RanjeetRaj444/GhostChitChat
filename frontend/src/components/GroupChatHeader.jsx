@@ -6,7 +6,17 @@ import {
   FaEllipsisV,
   FaSearch,
   FaTimes,
+  FaVideo,
+  FaPhoneAlt,
+  FaChevronDown,
+  FaInfoCircle,
+  FaBellSlash,
+  FaHeart,
+  FaTrash,
+  FaEraser,
+  FaFlag,
 } from "react-icons/fa";
+import { useRef, useEffect } from "react";
 
 function GroupChatHeader({
   group,
@@ -15,9 +25,31 @@ function GroupChatHeader({
   onOpenInfo,
   onlineCount,
   onSearch,
+  onClearChat,
+  onDeleteChat,
+  onMute,
+  onFavorite,
+  currentUser,
 }) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
+  const [showCallMenu, setShowCallMenu] = useState(false);
+  const menuRef = useRef(null);
+  const callMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+      if (callMenuRef.current && !callMenuRef.current.contains(event.target)) {
+        setShowCallMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   const memberCount = group?.members?.length || 0;
 
   const handleSearchChange = (val) => {
@@ -114,10 +146,10 @@ function GroupChatHeader({
         </AnimatePresence>
       </div>
 
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center">
         <button
           onClick={toggleSearch}
-          className="p-2.5 rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-all"
+          className="p-2.5 rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-all mr-1"
           title={isSearching ? "Close search" : "Search messages"}
         >
           {isSearching ? (
@@ -128,14 +160,139 @@ function GroupChatHeader({
         </button>
 
         {!isSearching && (
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={onOpenInfo}
-            className="p-2.5 rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
-          >
-            <FaEllipsisV className="w-4 h-4" />
-          </motion.button>
+          <>
+            {/* Call Button Group */}
+            <div className="relative mr-1" ref={callMenuRef}>
+              <button
+                onClick={() => setShowCallMenu(!showCallMenu)}
+                className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-all font-bold text-xs"
+              >
+                <FaVideo className="w-3.5 h-3.5" />
+                <span>Call</span>
+                <FaChevronDown
+                  className={`w-2.5 h-2.5 transition-transform ${showCallMenu ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              <AnimatePresence>
+                {showCallMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-neutral-800 rounded-2xl shadow-2xl border border-neutral-100 dark:border-neutral-700 z-[100] py-2 overflow-hidden"
+                  >
+                    <button className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+                      <FaVideo className="w-3.5 h-3.5 mr-3 text-primary-500" />
+                      Video Call
+                    </button>
+                    <button className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+                      <FaPhoneAlt className="w-3.5 h-3.5 mr-3 text-secondary-500" />
+                      Voice Call
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* More Options Menu */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-2.5 rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-all"
+              >
+                <FaEllipsisV className="w-4 h-4" />
+              </button>
+
+              <AnimatePresence>
+                {showMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-neutral-800 rounded-2xl shadow-2xl border border-neutral-100 dark:border-neutral-700 z-[100] py-2 overflow-hidden"
+                  >
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        onOpenInfo();
+                      }}
+                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                    >
+                      <FaInfoCircle className="w-3.5 h-3.5 mr-3 opacity-70" />
+                      Group Info
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        onMute?.(group?._id);
+                      }}
+                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                    >
+                      <FaBellSlash className="w-3.5 h-3.5 mr-3 opacity-70" />
+                      {currentUser?.mutedGroups?.includes(group?._id)
+                        ? "Unmute notifications"
+                        : "Mute notifications"}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        onFavorite?.(group?._id);
+                      }}
+                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                    >
+                      <FaHeart
+                        className={`w-3.5 h-3.5 mr-3 ${currentUser?.favoriteGroups?.includes(group?._id) ? "text-error-500" : "text-neutral-400"}`}
+                      />
+                      {currentUser?.favoriteGroups?.includes(group?._id)
+                        ? "Remove from favourites"
+                        : "Add to favourites"}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        onBack();
+                      }}
+                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors border-b border-neutral-100 dark:border-neutral-700/50 mb-1 pb-3"
+                    >
+                      <FaSignOutAlt className="w-3.5 h-3.5 mr-3 opacity-70" />
+                      Close chat
+                    </button>
+
+                    <button className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+                      <FaFlag className="w-3.5 h-3.5 mr-3 opacity-70" />
+                      Report Group
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        onClearChat?.(group?._id);
+                      }}
+                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                    >
+                      <FaEraser className="w-3.5 h-3.5 mr-3 opacity-70" />
+                      Clear chat
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        onDeleteChat?.(group?._id);
+                      }}
+                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-error-600 hover:bg-error-50 transition-colors"
+                    >
+                      <FaTrash className="w-3.5 h-3.5 mr-3" />
+                      Delete Group
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </>
         )}
       </div>
     </div>

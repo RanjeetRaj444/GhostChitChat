@@ -134,6 +134,7 @@ export function AuthProvider({ children }) {
     login,
     logout,
     updateProfile,
+    setCurrentUser,
     api,
   };
 

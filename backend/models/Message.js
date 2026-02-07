@@ -82,6 +82,12 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    starredBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ChatUser",
+      },
+    ],
   },
   {
     timestamps: true,

@@ -18,7 +18,7 @@ export const useGroupChat = () => {
     sendGroupMessage: sendSocketGroupMessage,
     markGroupRead,
   } = useSocket();
-  const { api, currentUser } = useAuth();
+  const { api, currentUser, setCurrentUser } = useAuth();
 
   const selectedGroupRef = useRef(selectedGroup);
   const groupMessagesRef = useRef(groupMessages);
@@ -655,6 +655,80 @@ export const useGroupChat = () => {
     }
   };
 
+  // Clear group chat history
+  const clearGroupChat = async (groupId, keepStarred = false) => {
+    if (!api) return false;
+    try {
+      await api.delete(
+        `/group-messages/clear/${groupId}?keepStarred=${keepStarred}`,
+      );
+      if (selectedGroupRef.current?._id === groupId && !keepStarred) {
+        setGroupMessages([]);
+      } else if (selectedGroupRef.current?._id === groupId && keepStarred) {
+        // Optimistically filter locally if keepStarred is true
+        setGroupMessages((prev) =>
+          prev.filter((m) =>
+            m.starredBy?.some(
+              (id) => (id._id || id).toString() === currentUser._id.toString(),
+            ),
+          ),
+        );
+      }
+      // Update groups list to remove last message preview if not keeping starred
+      if (!keepStarred) {
+        setGroups((prev) =>
+          prev.map((g) =>
+            g._id === groupId ? { ...g, lastMessage: null } : g,
+          ),
+        );
+      }
+      toast.success("Group chat cleared");
+      return true;
+    } catch (err) {
+      console.error("Clear group chat error:", err);
+      toast.error("Failed to clear group chat");
+      return false;
+    }
+  };
+
+  const muteGroup = async (groupId) => {
+    try {
+      const res = await api.post(`/users/mute/${groupId}`, { type: "group" });
+      setCurrentUser((prev) => ({
+        ...prev,
+        mutedGroups: res.data.mutedGroups,
+      }));
+      toast.success(res.data.isMuted ? "Group muted" : "Group unmuted");
+      return true;
+    } catch (err) {
+      console.error("Mute group error:", err);
+      toast.error("Failed to update mute status");
+      return false;
+    }
+  };
+
+  const toggleGroupFavorite = async (groupId) => {
+    try {
+      const res = await api.post(`/users/favorite/${groupId}`, {
+        type: "group",
+      });
+      setCurrentUser((prev) => ({
+        ...prev,
+        favoriteGroups: res.data.favoriteGroups,
+      }));
+      toast.success(
+        res.data.isFavorite
+          ? "Group added to favorites"
+          : "Group removed from favorites",
+      );
+      return true;
+    } catch (err) {
+      console.error("Favorite group error:", err);
+      toast.error("Failed to update favorite status");
+      return false;
+    }
+  };
+
   return {
     groups,
     selectedGroup,
@@ -679,5 +753,8 @@ export const useGroupChat = () => {
     updateGroup,
     refreshGroups: fetchGroups,
     setGroups,
+    clearGroupChat,
+    muteGroup,
+    toggleGroupFavorite,
   };
 };
