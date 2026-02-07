@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes, FaImage } from "react-icons/fa";
 import MessageActions from "./MessageActions";
 import ReplyPreview from "./ReplyPreview";
+import ReactionDetails from "./ReactionDetails";
 import toast from "react-hot-toast";
 
 function ChatWindow({
@@ -20,6 +21,15 @@ function ChatWindow({
 }) {
   const endRef = useRef(null);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [showReactionDetails, setShowReactionDetails] = useState(null); // { messageId, placement }
+
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      if (showReactionDetails) setShowReactionDetails(null);
+    };
+    document.addEventListener("click", handleGlobalClick);
+    return () => document.removeEventListener("click", handleGlobalClick);
+  }, [showReactionDetails]);
 
   useEffect(() => {
     if (endRef.current) {
@@ -103,6 +113,26 @@ function ChatWindow({
 
   const handleCopy = () => {
     toast.success("Copied to clipboard");
+  };
+
+  const handleReactionClick = (e, message) => {
+    e.stopPropagation();
+    if (!currentUser) return;
+
+    if (showReactionDetails?.messageId === message._id) {
+      setShowReactionDetails(null);
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+    const spaceBelow = windowHeight - rect.bottom;
+
+    // Position modal optimally
+    setShowReactionDetails({
+      messageId: message._id,
+      placement: spaceBelow < 250 ? "top" : "bottom",
+    });
   };
 
   const scrollToMessage = (messageId) => {
@@ -338,7 +368,7 @@ function ChatWindow({
                         {/* Reactions display */}
                         {reactions.length > 0 && !isDeleted && (
                           <div
-                            className={`flex flex-wrap gap-1 mt-1 ${isSentByCurrentUser ? "justify-end" : "justify-start"}`}
+                            className={`flex flex-wrap gap-1 mt-1 ${isSentByCurrentUser ? "justify-end" : "justify-start"} relative`}
                           >
                             {reactions.map((r, i) => (
                               <motion.div
@@ -347,7 +377,7 @@ function ChatWindow({
                                 animate={{ scale: 1 }}
                                 className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white dark:bg-neutral-800 rounded-full border border-neutral-200 dark:border-neutral-700 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                                 title={r.users.join(", ")}
-                                onClick={() => onReact?.(message._id, r.emoji)}
+                                onClick={(e) => handleReactionClick(e, message)}
                               >
                                 <span className="text-sm">{r.emoji}</span>
                                 {r.count > 1 && (
@@ -357,6 +387,22 @@ function ChatWindow({
                                 )}
                               </motion.div>
                             ))}
+
+                            <AnimatePresence>
+                              {showReactionDetails?.messageId ===
+                                message._id && (
+                                <ReactionDetails
+                                  message={message}
+                                  currentUser={currentUser}
+                                  placement={showReactionDetails.placement}
+                                  onClose={() => setShowReactionDetails(null)}
+                                  onRemoveReaction={(mid, emoji, target) => {
+                                    onReact?.(mid, emoji, target);
+                                    // If no more reactions after this, the component will unmount
+                                  }}
+                                />
+                              )}
+                            </AnimatePresence>
                           </div>
                         )}
 

@@ -366,21 +366,26 @@ export const useGroupChat = () => {
   };
 
   // React to a group message
-  const reactToMessage = async (messageId, emoji) => {
+  const reactToMessage = async (messageId, emoji, targetUserId = null) => {
     if (!selectedGroup) return;
 
-    // Check if user already has this reaction (for determining socket action)
+    // Check if finding another user's reaction for removal (moderation)
     const message = groupMessages.find((m) => m._id === messageId);
+    const userIdToFind = targetUserId || currentUser._id;
+
     const existingReaction = message?.reactions?.find(
       (r) =>
-        (r.user?._id === currentUser._id || r.user === currentUser._id) &&
+        (r.user?._id === userIdToFind || r.user === userIdToFind) &&
         r.emoji === emoji,
     );
-    const action = existingReaction ? "remove" : "add";
+
+    // If we have a targetUserId, it's always a 'remove' (or no-op if no reaction found)
+    const action = existingReaction || targetUserId ? "remove" : "add";
 
     try {
       const res = await api.post(`/group-messages/${messageId}/react`, {
         emoji,
+        targetUserId, // Send to backend to authorize and process removal
       });
 
       setGroupMessages((prev) =>
@@ -395,13 +400,15 @@ export const useGroupChat = () => {
         groupId: selectedGroup._id,
         messageId,
         emoji,
-        userId: currentUser._id,
+        userId: userIdToFind, // The user whose reaction is affected
         username: currentUser.username,
         action,
       });
     } catch (err) {
       console.error("React to group message error:", err);
-      toast.error("Failed to react");
+      toast.error(
+        targetUserId ? "Failed to remove reaction" : "Failed to react",
+      );
     }
   };
 

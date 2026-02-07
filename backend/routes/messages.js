@@ -158,21 +158,31 @@ router.post("/:messageId/react", auth, async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    // Find existing reaction from this user
+    const { targetUserId } = req.body;
+
+    // Find existing reaction
+    // If targetUserId is provided and the requester is the message sender, they can remove that user's reaction
+    const canModerate = message.sender.toString() === req.user._id.toString();
+    const findUserId =
+      targetUserId && canModerate ? targetUserId : req.user._id.toString();
+
     const existingReactionIndex = message.reactions.findIndex(
-      (r) => r.user.toString() === req.user._id.toString(),
+      (r) => r.user.toString() === findUserId,
     );
 
     if (existingReactionIndex > -1) {
-      // If same emoji, remove reaction; otherwise update it
-      if (message.reactions[existingReactionIndex].emoji === emoji) {
+      // If same emoji (or we are moderating), remove reaction; otherwise update it
+      if (
+        message.reactions[existingReactionIndex].emoji === emoji ||
+        (targetUserId && canModerate)
+      ) {
         message.reactions.splice(existingReactionIndex, 1);
       } else {
         message.reactions[existingReactionIndex].emoji = emoji;
         message.reactions[existingReactionIndex].createdAt = new Date();
       }
-    } else {
-      // Add new reaction
+    } else if (!targetUserId) {
+      // Add new reaction (only if not trying to moderate a non-existent reaction)
       message.reactions.push({
         user: req.user._id,
         emoji,

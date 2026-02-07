@@ -27,6 +27,7 @@ function MessageActions({
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [menuPlacement, setMenuPlacement] = useState("bottom"); // 'top' or 'bottom'
   const menuRef = useRef(null);
 
   // Close menu when clicking outside
@@ -85,19 +86,54 @@ function MessageActions({
     );
   };
 
+  const toggleMenu = (e) => {
+    if (!showMenu) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const spaceBelow = windowHeight - rect.bottom;
+      // If less than 250px below, open upwards
+      setMenuPlacement(spaceBelow < 250 ? "top" : "bottom");
+    }
+    setShowMenu(!showMenu);
+    setShowReactions(false);
+  };
+
+  const toggleReactions = (e) => {
+    if (!showReactions) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const spaceBelow = windowHeight - rect.bottom;
+      // Reactions bar is smaller, but usually opens upward anyway.
+      // We'll use the same logic for consistency if we ever change it.
+      setMenuPlacement(spaceBelow < 150 ? "top" : "bottom");
+    }
+    setShowReactions(!showReactions);
+    setShowMenu(false);
+  };
+
   return (
     <div
       ref={menuRef}
-      className={`opacity-0 group-hover/bubble:opacity-100 transition-opacity z-20 flex-shrink-0`}
+      className={`opacity-0 group-hover/bubble:opacity-100 transition-opacity z-20 flex-shrink-0 relative`}
     >
       {/* Quick reactions bar */}
       <AnimatePresence>
         {showReactions && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            initial={{
+              opacity: 0,
+              scale: 0.8,
+              y: menuPlacement === "top" ? -10 : 10,
+            }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: 10 }}
-            className={`absolute ${isSentByCurrentUser ? "right-0" : "left-0"} bottom-full mb-2 flex items-center gap-0.5 bg-white dark:bg-neutral-800 rounded-full px-1.5 py-1 shadow-xl border border-neutral-200 dark:border-neutral-700`}
+            exit={{
+              opacity: 0,
+              scale: 0.8,
+              y: menuPlacement === "top" ? -10 : 10,
+            }}
+            className={`absolute ${isSentByCurrentUser ? "right-0" : "left-0"} ${
+              menuPlacement === "top" ? "bottom-full mb-2" : "top-full mt-2"
+            } flex items-center gap-0.5 bg-white dark:bg-neutral-800 rounded-full px-1.5 py-1 shadow-xl border border-neutral-200 dark:border-neutral-700 z-40`}
           >
             {QUICK_REACTIONS.map((emoji) => (
               <button
@@ -120,10 +156,7 @@ function MessageActions({
       {/* Action buttons - horizontal bar */}
       <div className="flex items-center gap-0.5 bg-white dark:bg-neutral-800 rounded-full px-1 py-0.5 shadow-lg border border-neutral-200 dark:border-neutral-700">
         <button
-          onClick={() => {
-            setShowReactions(!showReactions);
-            setShowMenu(false);
-          }}
+          onClick={toggleReactions}
           className={`p-1.5 rounded-full transition-colors ${
             showReactions
               ? "bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
@@ -143,10 +176,7 @@ function MessageActions({
         </button>
 
         <button
-          onClick={() => {
-            setShowMenu(!showMenu);
-            setShowReactions(false);
-          }}
+          onClick={toggleMenu}
           className={`p-1.5 rounded-full transition-colors ${
             showMenu
               ? "bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
@@ -162,10 +192,20 @@ function MessageActions({
       <AnimatePresence>
         {showMenu && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            initial={{
+              opacity: 0,
+              scale: 0.95,
+              y: menuPlacement === "top" ? 10 : -10,
+            }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            className={`absolute ${isSentByCurrentUser ? "right-0" : "left-0"} top-full mt-2 w-44 bg-white dark:bg-neutral-800 rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden z-30`}
+            exit={{
+              opacity: 0,
+              scale: 0.95,
+              y: menuPlacement === "top" ? 10 : -10,
+            }}
+            className={`absolute ${isSentByCurrentUser ? "right-0" : "left-0"} ${
+              menuPlacement === "top" ? "bottom-full mb-2" : "top-full mt-2"
+            } w-44 bg-white dark:bg-neutral-800 rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden z-30`}
           >
             {/* Copy */}
             {message.content && message.messageType !== "image" && (
