@@ -154,6 +154,43 @@ router.get("/:groupId", auth, async (req, res) => {
   }
 });
 
+// Search group messages
+router.get("/search/:groupId", auth, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { q } = req.query;
+
+    if (!q) return res.json([]);
+
+    // Verify membership
+    const group = await Group.findById(groupId);
+    if (!group || !group.members.includes(req.user._id)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const messages = await GroupMessage.searchGroupMessages(
+      groupId,
+      req.user._id,
+      q,
+    );
+    res.json(messages);
+  } catch (error) {
+    console.error("Search group messages error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get all starred messages from groups
+router.get("/starred/all", auth, async (req, res) => {
+  try {
+    const messages = await GroupMessage.getStarredMessages(req.user._id);
+    res.json(messages);
+  } catch (error) {
+    console.error("Get starred group messages error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Mark group messages as read
 router.put("/read/:groupId", auth, async (req, res) => {
   try {

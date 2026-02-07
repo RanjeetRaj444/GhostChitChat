@@ -131,7 +131,9 @@ messageSchema.statics.getUserConversations = async function (userId) {
   const userCollectionName = userModel.collection.name || "chatusers";
 
   // 1. Get user's contacts first
-  const user = await userModel.findById(userId).select("contacts");
+  const user = await userModel
+    .findById(userId)
+    .select("contacts favoriteUsers blockedUsers");
   const contactIds = user?.contacts || [];
 
   const conversations = await this.aggregate([
@@ -253,12 +255,59 @@ messageSchema.statics.getUserConversations = async function (userId) {
             { $ifNull: ["$user.blockedUsers", []] },
           ],
         },
+        "user.isFavorite": {
+          $in: ["$user._id", { $ifNull: [user.favoriteUsers, []] }],
+        },
       },
     },
-    { $sort: { "lastMessage.createdAt": -1, "user.username": 1 } },
+    {
+      $sort: {
+        "user.isFavorite": -1,
+        "lastMessage.createdAt": -1,
+        "user.username": 1,
+      },
+    },
   ]);
 
   return conversations;
+};
+
+messageSchema.statics.searchMessages = async function (
+  userId,
+  query,
+  limit = 50,
+) {
+  return this.find({
+    $or: [{ sender: userId }, { receiver: userId }],
+    content: { $regex: query, $options: "i" },
+    messageType: "text",
+    deletedFor: { $ne: userId },
+    deletedForEveryone: false,
+  })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate("sender", "username avatar")
+    .populate("receiver", "username avatar")
+    .populate({
+      path: "replyTo",
+      select: "content sender messageType imageUrl",
+      populate: { path: "sender", select: "username avatar" },
+    });
+};
+
+messageSchema.statics.getStarredMessages = async function (userId) {
+  return this.find({
+    starredBy: userId,
+    deletedFor: { $ne: userId },
+  })
+    .sort({ createdAt: -1 })
+    .populate("sender", "username avatar")
+    .populate("receiver", "username avatar")
+    .populate({
+      path: "replyTo",
+      select: "content sender messageType imageUrl",
+      populate: { path: "sender", select: "username avatar" },
+    });
 };
 
 const Message = mongoose.model("ChatMessage", messageSchema);

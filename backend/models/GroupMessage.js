@@ -146,6 +146,44 @@ groupMessageSchema.statics.markAsRead = async function (groupId, userId) {
   );
 };
 
+groupMessageSchema.statics.searchGroupMessages = async function (
+  groupId,
+  userId,
+  query,
+  limit = 50,
+) {
+  return this.find({
+    group: groupId,
+    content: { $regex: query, $options: "i" },
+    messageType: "text",
+    deletedFor: { $ne: userId },
+    deletedForEveryone: false,
+  })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate("sender", "username avatar")
+    .populate({
+      path: "replyTo",
+      select: "content sender messageType imageUrl",
+      populate: { path: "sender", select: "username avatar" },
+    });
+};
+
+groupMessageSchema.statics.getStarredMessages = async function (userId) {
+  return this.find({
+    starredBy: userId,
+    deletedFor: { $ne: userId },
+  })
+    .sort({ createdAt: -1 })
+    .populate("sender", "username avatar")
+    .populate("group", "name avatar")
+    .populate({
+      path: "replyTo",
+      select: "content sender messageType imageUrl",
+      populate: { path: "sender", select: "username avatar" },
+    });
+};
+
 const GroupMessage = mongoose.model("GroupMessage", groupMessageSchema);
 
 export default GroupMessage;

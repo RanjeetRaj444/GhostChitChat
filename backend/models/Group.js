@@ -64,6 +64,11 @@ groupSchema.index({ lastActivity: -1 });
 // Get all groups for a user with last message
 groupSchema.statics.getUserGroups = async function (userId) {
   const GroupMessage = mongoose.model("GroupMessage");
+  const user = await mongoose
+    .model("ChatUser")
+    .findById(userId)
+    .select("favoriteGroups");
+  const favoriteGroups = user?.favoriteGroups?.map((id) => id.toString()) || [];
 
   const groups = await this.find({ members: userId })
     .populate("members", "username avatar isOnline")
@@ -71,6 +76,17 @@ groupSchema.statics.getUserGroups = async function (userId) {
     .populate("createdBy", "username avatar")
     .sort({ lastActivity: -1 })
     .lean();
+
+  // Mark favorites and handle sorting
+  groups.forEach((g) => {
+    g.isFavorite = favoriteGroups.includes(g._id.toString());
+  });
+
+  groups.sort((a, b) => {
+    if (a.isFavorite && !b.isFavorite) return -1;
+    if (!a.isFavorite && b.isFavorite) return 1;
+    return new Date(b.lastActivity) - new Date(a.lastActivity);
+  });
 
   // Get last message and unread count for each group
   const groupsWithMessages = await Promise.all(

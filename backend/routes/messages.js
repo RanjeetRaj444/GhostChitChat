@@ -149,6 +149,31 @@ router.get("/", auth, async (req, res) => {
   }
 });
 
+// Search messages
+router.get("/search", auth, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) return res.json([]);
+
+    const messages = await Message.searchMessages(req.user._id, q);
+    res.json(messages);
+  } catch (error) {
+    console.error("Search messages error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get starred messages
+router.get("/starred/all", auth, async (req, res) => {
+  try {
+    const messages = await Message.getStarredMessages(req.user._id);
+    res.json(messages);
+  } catch (error) {
+    console.error("Get starred messages error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Mark messages as read
 router.put("/read/:userId", auth, async (req, res) => {
   try {

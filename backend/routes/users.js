@@ -1,6 +1,7 @@
 import express from "express";
 import User from "../models/User.js";
 import Message from "../models/Message.js";
+import Report from "../models/Report.js";
 import { auth } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -235,10 +236,17 @@ router.post("/report/:id", auth, async (req, res) => {
     const targetId = req.params.id;
     const { reason } = req.body;
 
-    // In a real app, you would save this to a Reports collection
-    console.log(
-      `[REPORT] User ${req.user._id} reported ${targetId}. Reason: ${reason || "No reason provided"}`,
-    );
+    if (!reason) {
+      return res.status(400).json({ message: "Reason is required" });
+    }
+
+    const report = new Report({
+      reporter: req.user._id,
+      target: targetId,
+      reason,
+    });
+
+    await report.save();
 
     res.json({ success: true, message: "Report received" });
   } catch (error) {

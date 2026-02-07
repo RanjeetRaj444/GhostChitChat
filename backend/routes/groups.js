@@ -240,4 +240,74 @@ router.delete("/:groupId", auth, async (req, res) => {
   }
 });
 
+// Promote member to admin
+router.post("/:groupId/promote/:userId", auth, async (req, res) => {
+  try {
+    const { groupId, userId } = req.params;
+    const group = await Group.findById(groupId);
+
+    if (!group) return res.status(404).json({ message: "Group not found" });
+
+    const isAdmin = group.admins.some(
+      (a) => a.toString() === req.user._id.toString(),
+    );
+    if (!isAdmin)
+      return res
+        .status(403)
+        .json({ message: "Only admins can promote members" });
+
+    if (!group.members.includes(userId))
+      return res
+        .status(400)
+        .json({ message: "User is not a member of this group" });
+
+    if (group.admins.includes(userId))
+      return res.status(400).json({ message: "User is already an admin" });
+
+    group.admins.push(userId);
+    await group.save();
+    await group.populate("members", "username avatar isOnline");
+    await group.populate("admins", "username avatar");
+
+    res.json(group);
+  } catch (error) {
+    console.error("Promote admin error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Demote admin to member
+router.post("/:groupId/demote/:userId", auth, async (req, res) => {
+  try {
+    const { groupId, userId } = req.params;
+    const group = await Group.findById(groupId);
+
+    if (!group) return res.status(404).json({ message: "Group not found" });
+
+    const isAdmin = group.admins.some(
+      (a) => a.toString() === req.user._id.toString(),
+    );
+    if (!isAdmin)
+      return res
+        .status(403)
+        .json({ message: "Only admins can demote members" });
+
+    if (group.createdBy.toString() === userId)
+      return res.status(400).json({ message: "Cannot demote group creator" });
+
+    if (!group.admins.includes(userId))
+      return res.status(400).json({ message: "User is not an admin" });
+
+    group.admins = group.admins.filter((a) => a.toString() !== userId);
+    await group.save();
+    await group.populate("members", "username avatar isOnline");
+    await group.populate("admins", "username avatar");
+
+    res.json(group);
+  } catch (error) {
+    console.error("Demote admin error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;
