@@ -12,6 +12,7 @@ import UserProfileModal from "../components/UserProfileModal";
 import CreateGroupModal from "../components/CreateGroupModal";
 import GroupChatHeader from "../components/GroupChatHeader";
 import GroupInfoModal from "../components/GroupInfoModal";
+import ConfirmationModal from "../components/ConfirmationModal";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 
@@ -20,6 +21,8 @@ function ChatPage() {
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const [contactToDelete, setContactToDelete] = useState(null);
+  const [isDeletingContact, setIsDeletingContact] = useState(false);
 
   const {
     isUserOnline,
@@ -51,6 +54,9 @@ function ChatPage() {
     setEditingMessage,
     setMessages,
     refreshConversations,
+    removeContact,
+    blockUser,
+    unblockUser,
   } = useChat();
 
   // Group chat hooks
@@ -203,6 +209,25 @@ function ChatPage() {
     setGroupEditingMessage(null);
   };
 
+  const handleRemoveContact = async () => {
+    if (!contactToDelete) return;
+
+    setIsDeletingContact(true);
+    try {
+      const success = await removeContact(contactToDelete._id);
+      if (success) {
+        toast.success("Contact and chat history removed");
+        setContactToDelete(null);
+        refreshConversations();
+      }
+    } catch (err) {
+      console.error("Remove contact error:", err);
+      toast.error("An error occurred while removing the contact");
+    } finally {
+      setIsDeletingContact(false);
+    }
+  };
+
   // Count online members in a group
   const getOnlineCount = () => {
     if (!selectedGroup?.members) return 0;
@@ -245,6 +270,9 @@ function ChatPage() {
             selectedGroup={selectedGroup}
             onSelectGroup={handleSelectGroup}
             onCreateGroupClick={() => setShowCreateGroupModal(true)}
+            onRemoveContact={(user) => setContactToDelete(user)}
+            onBlock={blockUser}
+            onUnblock={unblockUser}
           />
         </motion.div>
 
@@ -269,6 +297,8 @@ function ChatPage() {
                     onBack={() => setSelectedUser(null)}
                     onOpenProfile={() => setShowProfileModal(true)}
                     onSearch={setChatSearchQuery}
+                    onBlock={blockUser}
+                    onUnblock={unblockUser}
                   />
                 ) : (
                   <GroupChatHeader
@@ -304,6 +334,8 @@ function ChatPage() {
                   editingMessage={currentEditingMessage}
                   onCancelEdit={handleCancelEdit}
                   onEditMessage={handleEditMessage}
+                  isBlocked={selectedUser?.blockedByMe}
+                  hasBlockedMe={selectedUser?.hasBlockedMe}
                 />
               </motion.div>
             ) : (
@@ -420,6 +452,19 @@ function ChatPage() {
             onUpdateGroup={updateGroup}
           />
         )}
+
+        {/* Delete Contact Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={!!contactToDelete}
+          onClose={() => setContactToDelete(null)}
+          onConfirm={handleRemoveContact}
+          title="Delete Contact?"
+          message={`Are you sure you want to remove ${contactToDelete?.username} from your contacts? This will permanently delete your entire chat history, including all messages and media files. This action cannot be undone.`}
+          confirmText="Delete Everything"
+          cancelText="Cancel"
+          isDanger={true}
+          loading={isDeletingContact}
+        />
       </AnimatePresence>
     </div>
   );

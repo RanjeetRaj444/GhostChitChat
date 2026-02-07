@@ -60,6 +60,12 @@ const userSchema = new mongoose.Schema(
         ref: "ChatUser",
       },
     ],
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ChatUser",
+      },
+    ],
   },
   {
     timestamps: true,

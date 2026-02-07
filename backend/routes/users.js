@@ -1,5 +1,6 @@
 import express from "express";
 import User from "../models/User.js";
+import Message from "../models/Message.js";
 import { auth } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -89,15 +90,34 @@ router.post("/contacts/:id", auth, async (req, res) => {
   }
 });
 
-// Remove user from contacts
+// Remove user from contacts and wipe data
 router.delete("/contacts/:id", auth, async (req, res) => {
   try {
     const contactId = req.params.id;
+    const userId = req.user._id;
+
+    // 1. Remove from contacts
     req.user.contacts = req.user.contacts.filter(
       (id) => id.toString() !== contactId,
     );
     await req.user.save();
-    res.json({ success: true, contacts: req.user.contacts });
+
+    // 2. Wipe messages for this user (Soft Delete)
+    // Add this user to 'deletedFor' for all messages in the conversation
+    await Message.updateMany(
+      {
+        $or: [
+          { sender: userId, receiver: contactId },
+          { sender: contactId, receiver: userId },
+        ],
+        deletedFor: { $ne: userId },
+      },
+      {
+        $addToSet: { deletedFor: userId },
+      },
+    );
+
+    res.json({ success: true, message: "Contact and chat data removed" });
   } catch (error) {
     console.error("Remove contact error:", error);
     res.status(500).json({ message: "Server error" });
@@ -114,6 +134,41 @@ router.get("/contacts/all", auth, async (req, res) => {
     res.json(user.contacts);
   } catch (error) {
     console.error("Get contacts error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Block user
+router.post("/block/:id", auth, async (req, res) => {
+  try {
+    const blockId = req.params.id;
+    if (blockId === req.user._id.toString()) {
+      return res.status(400).json({ message: "Cannot block yourself" });
+    }
+
+    if (!req.user.blockedUsers.includes(blockId)) {
+      req.user.blockedUsers.push(blockId);
+      await req.user.save();
+    }
+
+    res.json({ success: true, blockedUsers: req.user.blockedUsers });
+  } catch (error) {
+    console.error("Block user error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Unblock user
+router.post("/unblock/:id", auth, async (req, res) => {
+  try {
+    const unblockId = req.params.id;
+    req.user.blockedUsers = req.user.blockedUsers.filter(
+      (id) => id.toString() !== unblockId,
+    );
+    await req.user.save();
+    res.json({ success: true, blockedUsers: req.user.blockedUsers });
+  } catch (error) {
+    console.error("Unblock user error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

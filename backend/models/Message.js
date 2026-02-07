@@ -217,7 +217,7 @@ messageSchema.statics.getUserConversations = async function (userId) {
     { $unwind: { path: "$lookedUpUser", preserveNullAndEmptyArrays: true } },
     {
       $project: {
-        _id: 1,
+        _id: { $ifNull: ["$_id", "$user._id"] },
         user: {
           _id: { $ifNull: ["$unionUser._id", "$lookedUpUser._id"] },
           username: {
@@ -230,9 +230,23 @@ messageSchema.statics.getUserConversations = async function (userId) {
           lastSeen: {
             $ifNull: ["$unionUser.lastSeen", "$lookedUpUser.lastSeen"],
           },
+          blockedUsers: { $ifNull: ["$lookedUpUser.blockedUsers", []] },
         },
         lastMessage: 1,
         unreadCount: 1,
+      },
+    },
+    {
+      $addFields: {
+        "user.blockedByMe": {
+          $in: ["$user._id", { $ifNull: [user.blockedUsers, []] }],
+        },
+        "user.hasBlockedMe": {
+          $in: [
+            new mongoose.Types.ObjectId(userId),
+            { $ifNull: ["$user.blockedUsers", []] },
+          ],
+        },
       },
     },
     { $sort: { "lastMessage.createdAt": -1, "user.username": 1 } },

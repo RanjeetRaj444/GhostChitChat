@@ -10,6 +10,10 @@ import {
   FaPlus,
   FaUsers,
   FaComments,
+  FaTrash,
+  FaEllipsisV,
+  FaBan,
+  FaUnlock,
 } from "react-icons/fa";
 
 function Sidebar({
@@ -30,7 +34,11 @@ function Sidebar({
   selectedGroup,
   onSelectGroup,
   onCreateGroupClick,
+  onRemoveContact,
+  onBlock,
+  onUnblock,
 }) {
+  const [activeDropdown, setActiveDropdown] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAllUsers, setShowAllUsers] = useState(false);
   const [activeTab, setActiveTab] = useState("chats"); // "chats" or "groups"
@@ -74,11 +82,13 @@ function Sidebar({
   const handleSelectChat = (user) => {
     onSelectGroup?.(null);
     onSelectUser(user);
+    setActiveDropdown(null);
   };
 
   const handleSelectGroup = (group) => {
     onSelectUser(null);
     onSelectGroup?.(group);
+    setActiveDropdown(null);
   };
 
   return (
@@ -207,23 +217,24 @@ function Sidebar({
                   <div className="space-y-1">
                     {filteredConversations.map((conversation) => (
                       <motion.div
-                        key={conversation._id}
+                        key={conversation._id || conversation.user._id}
                         layout
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
+                        className={`group relative rounded-2xl transition-all duration-300 border border-transparent ${
+                          selectedUser &&
+                          selectedUser._id === conversation.user._id &&
+                          !selectedGroup
+                            ? "bg-white dark:bg-neutral-700 shadow-md shadow-neutral-200/50 dark:shadow-none border-neutral-100 dark:border-neutral-600"
+                            : "hover:bg-neutral-50 dark:hover:bg-neutral-700/30"
+                        } ${activeDropdown === conversation.user._id ? "z-[60]" : "z-0"}`}
                       >
-                        <button
+                        <div
                           onClick={() => handleSelectChat(conversation.user)}
-                          className={`w-full flex items-center px-3 py-3 rounded-2xl transition-all duration-300 group relative border border-transparent ${
-                            selectedUser &&
-                            selectedUser._id === conversation.user._id &&
-                            !selectedGroup
-                              ? "bg-white dark:bg-neutral-700 shadow-md shadow-neutral-200/50 dark:shadow-none border-neutral-100 dark:border-neutral-600"
-                              : "hover:bg-neutral-50 dark:hover:bg-neutral-700/30"
-                          }`}
+                          className="w-full flex items-center px-3 py-3 cursor-pointer"
                         >
-                          <div className="relative flex-shrink-0">
+                          <div className="relative flex-shrink-0 pointer-events-none">
                             <img
                               src={
                                 conversation.user.avatar ||
@@ -243,7 +254,7 @@ function Sidebar({
                             )}
                           </div>
 
-                          <div className="ml-4 flex-1 overflow-hidden text-left">
+                          <div className="ml-4 flex-1 overflow-hidden pointer-events-none">
                             <div className="flex justify-between items-baseline mb-1">
                               <h3
                                 className={`text-sm font-bold truncate ${
@@ -305,7 +316,93 @@ function Sidebar({
                               )}
                             </div>
                           </div>
-                        </button>
+                        </div>
+
+                        {/* Options Menu Button - Absolute Positioned */}
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-[70]">
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveDropdown(
+                                  activeDropdown === conversation.user._id
+                                    ? null
+                                    : conversation.user._id,
+                                );
+                              }}
+                              className="p-2 opacity-0 group-hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-neutral-600 rounded-lg text-neutral-400 transition-all duration-200"
+                              title="Options"
+                            >
+                              <FaEllipsisV className="w-3.5 h-3.5" />
+                            </button>
+
+                            <AnimatePresence>
+                              {activeDropdown === conversation.user._id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-[80]"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveDropdown(null);
+                                    }}
+                                  ></div>
+
+                                  <motion.div
+                                    initial={{
+                                      opacity: 0,
+                                      scale: 0.95,
+                                      y: -10,
+                                    }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    className="absolute right-0 top-full mt-2 w-44 bg-white dark:bg-neutral-800 rounded-2xl shadow-2xl border border-neutral-100 dark:border-neutral-700 z-[90] py-2 overflow-hidden shadow-neutral-900/10 dark:shadow-black/50"
+                                  >
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(null);
+                                        if (conversation.user.blockedByMe) {
+                                          onUnblock?.(conversation.user._id);
+                                        } else {
+                                          onBlock?.(conversation.user._id);
+                                        }
+                                      }}
+                                      className={`w-full flex items-center px-4 py-2.5 text-xs font-bold transition-colors ${
+                                        conversation.user.blockedByMe
+                                          ? "text-success-600 hover:bg-success-50 dark:hover:bg-success-500/10"
+                                          : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                                      }`}
+                                    >
+                                      {conversation.user.blockedByMe ? (
+                                        <>
+                                          <FaUnlock className="w-3 h-3 mr-2.5" />
+                                          Unblock
+                                        </>
+                                      ) : (
+                                        <>
+                                          <FaBan className="w-3 h-3 mr-2.5" />
+                                          Block
+                                        </>
+                                      )}
+                                    </button>
+
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(null);
+                                        onRemoveContact(conversation.user);
+                                      }}
+                                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-error-500 hover:bg-error-50 dark:hover:bg-error-500/10 transition-colors"
+                                    >
+                                      <FaTrash className="w-3 h-3 mr-2.5" />
+                                      Delete
+                                    </button>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        </div>
                       </motion.div>
                     ))}
                   </div>

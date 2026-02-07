@@ -13,6 +13,8 @@ function ChatInput({
   editingMessage,
   onCancelEdit,
   onEditMessage,
+  isBlocked,
+  hasBlockedMe,
 }) {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -220,72 +222,85 @@ function ChatInput({
       </AnimatePresence>
 
       <form onSubmit={handleSubmit} className="flex items-center space-x-2 p-4">
-        <button
-          type="button"
-          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className={`p-2 rounded-full transition-colors ${
-            showEmojiPicker
-              ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
-              : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-          }`}
-          aria-label="Add emoji"
-        >
-          <FaSmile className="w-5 h-5" />
-        </button>
+        {isBlocked || hasBlockedMe ? (
+          <div className="flex-1 bg-neutral-100 dark:bg-neutral-700/50 p-3 rounded-2xl border-2 border-dashed border-neutral-300 dark:border-neutral-600 flex items-center justify-center space-x-2">
+            <FaBan className="w-3.5 h-3.5 text-neutral-400" />
+            <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400">
+              {isBlocked
+                ? "You have blocked this user. Unblock to send messages."
+                : "This user has blocked you."}
+            </p>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`p-2 rounded-full transition-colors ${
+                showEmojiPicker
+                  ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                  : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+              }`}
+              aria-label="Add emoji"
+            >
+              <FaSmile className="w-5 h-5" />
+            </button>
 
-        {/* Image Upload Button */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleImageSelect}
-          accept="image/*"
-          className="hidden"
-        />
-        {!editingMessage && (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="p-2 rounded-full transition-colors text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
-            aria-label="Attach image"
-          >
-            <FaImage className="w-5 h-5" />
-          </button>
+            {/* Image Upload Button */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageSelect}
+              accept="image/*"
+              className="hidden"
+            />
+            {!editingMessage && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="p-2 rounded-full transition-colors text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
+                aria-label="Attach image"
+              >
+                <FaImage className="w-5 h-5" />
+              </button>
+            )}
+
+            <input
+              type="text"
+              ref={inputRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={
+                editingMessage
+                  ? "Edit your message..."
+                  : selectedImage
+                    ? "Add a caption..."
+                    : "Type a message..."
+              }
+              className="input py-2"
+              autoComplete="off"
+              disabled={isUploading}
+            />
+
+            <button
+              type="submit"
+              disabled={!canSend || isUploading}
+              className={`p-2 rounded-full transition-colors ${
+                canSend && !isUploading
+                  ? "bg-primary-600 text-white hover:bg-primary-700"
+                  : "bg-neutral-200 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+              }`}
+              aria-label={editingMessage ? "Save edit" : "Send message"}
+            >
+              {isUploading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <FaPaperPlane className="w-5 h-5" />
+              )}
+            </button>
+          </>
         )}
-
-        <input
-          type="text"
-          ref={inputRef}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder={
-            editingMessage
-              ? "Edit your message..."
-              : selectedImage
-                ? "Add a caption..."
-                : "Type a message..."
-          }
-          className="input py-2"
-          autoComplete="off"
-          disabled={isUploading}
-        />
-
-        <button
-          type="submit"
-          disabled={!canSend || isUploading}
-          className={`p-2 rounded-full transition-colors ${
-            canSend && !isUploading
-              ? "bg-primary-600 text-white hover:bg-primary-700"
-              : "bg-neutral-200 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-          }`}
-          aria-label={editingMessage ? "Save edit" : "Send message"}
-        >
-          {isUploading ? (
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <FaPaperPlane className="w-5 h-5" />
-          )}
-        </button>
       </form>
     </div>
   );

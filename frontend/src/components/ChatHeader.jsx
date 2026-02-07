@@ -1,4 +1,10 @@
-import { FaArrowLeft, FaSearch, FaTimes } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaSearch,
+  FaTimes,
+  FaBan,
+  FaUnlock,
+} from "react-icons/fa";
 import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,6 +16,8 @@ function ChatHeader({
   onBack,
   onOpenProfile,
   onSearch,
+  onBlock,
+  onUnblock,
 }) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,6 +134,24 @@ function ChatHeader({
           <FaTimes className="w-4 h-4" />
         ) : (
           <FaSearch className="w-4 h-4" />
+        )}
+      </button>
+
+      <button
+        onClick={() =>
+          user.blockedByMe ? onUnblock?.(user._id) : onBlock?.(user._id)
+        }
+        className={`ml-2 p-2.5 rounded-xl transition-all ${
+          user.blockedByMe
+            ? "text-success-500 bg-success-50 dark:bg-success-500/10 hover:bg-success-100 dark:hover:bg-success-500/20"
+            : "text-error-500 bg-error-50 dark:bg-error-500/10 hover:bg-error-100 dark:hover:bg-error-500/20"
+        }`}
+        title={user.blockedByMe ? "Unblock User" : "Block User"}
+      >
+        {user.blockedByMe ? (
+          <FaUnlock className="w-4 h-4" />
+        ) : (
+          <FaBan className="w-4 h-4" />
         )}
       </button>
     </div>

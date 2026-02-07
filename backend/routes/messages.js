@@ -15,6 +15,17 @@ router.post("/", auth, async (req, res) => {
       return res.status(400).json({ message: "Message cannot be empty" });
     }
 
+    // Check for blocks
+    const receiver = await mongoose.model("ChatUser").findById(receiverId);
+    if (!receiver) return res.status(404).json({ message: "User not found" });
+
+    if (receiver.blockedUsers.includes(req.user._id)) {
+      return res.status(403).json({ message: "You are blocked by this user" });
+    }
+    if (req.user.blockedUsers.includes(receiverId)) {
+      return res.status(403).json({ message: "You have blocked this user" });
+    }
+
     const message = new Message({
       sender: req.user._id,
       receiver: receiverId,
@@ -56,6 +67,17 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
     }
 
     const imageUrl = `/uploads/${req.file.filename}`;
+
+    // Check for blocks
+    const receiver = await mongoose.model("ChatUser").findById(receiverId);
+    if (!receiver) return res.status(404).json({ message: "User not found" });
+
+    if (receiver.blockedUsers.includes(req.user._id)) {
+      return res.status(403).json({ message: "You are blocked by this user" });
+    }
+    if (req.user.blockedUsers.includes(receiverId)) {
+      return res.status(403).json({ message: "You have blocked this user" });
+    }
 
     const message = new Message({
       sender: req.user._id,

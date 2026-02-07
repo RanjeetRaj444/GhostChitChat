@@ -551,6 +551,68 @@ export const useChat = () => {
     });
   };
 
+  const removeContact = async (userId) => {
+    try {
+      await api.delete(`/users/contacts/${userId}`);
+      setConversations((prev) =>
+        prev.filter((c) => c._id !== userId && c.user?._id !== userId),
+      );
+      if (selectedUserRef.current?._id === userId) {
+        setSelectedUser(null);
+        setMessages([]);
+      }
+      return true;
+    } catch (err) {
+      console.error("Remove contact error:", err);
+      toast.error("Failed to remove contact");
+      return false;
+    }
+  };
+
+  const blockUser = async (userId) => {
+    try {
+      await api.post(`/users/block/${userId}`);
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.user?._id === userId
+            ? { ...c, user: { ...c.user, blockedByMe: true } }
+            : c,
+        ),
+      );
+      if (selectedUserRef.current?._id === userId) {
+        setSelectedUser((prev) => ({ ...prev, blockedByMe: true }));
+      }
+      toast.success("User blocked");
+      return true;
+    } catch (err) {
+      console.error("Block user error:", err);
+      toast.error("Failed to block user");
+      return false;
+    }
+  };
+
+  const unblockUser = async (userId) => {
+    try {
+      await api.post(`/users/unblock/${userId}`);
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.user?._id === userId
+            ? { ...c, user: { ...c.user, blockedByMe: false } }
+            : c,
+        ),
+      );
+      if (selectedUserRef.current?._id === userId) {
+        setSelectedUser((prev) => ({ ...prev, blockedByMe: false }));
+      }
+      toast.success("User unblocked");
+      return true;
+    } catch (err) {
+      console.error("Unblock user error:", err);
+      toast.error("Failed to unblock user");
+      return false;
+    }
+  };
+
   return {
     conversations,
     users,
@@ -571,5 +633,8 @@ export const useChat = () => {
     setConversations,
     setMessages,
     refreshConversations: fetchInitialData,
+    removeContact,
+    blockUser,
+    unblockUser,
   };
 };
