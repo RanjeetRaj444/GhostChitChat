@@ -432,6 +432,7 @@ export const useChat = () => {
         messageId,
         emoji,
         userId: userIdToFind, // The user whose reaction is affected
+        receiverId: selectedUser._id,
         username: currentUser.username,
         action,
       });

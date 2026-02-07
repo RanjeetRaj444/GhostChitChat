@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaTimes, FaImage } from "react-icons/fa";
+import { FaTimes, FaImage, FaArrowDown } from "react-icons/fa";
 import MessageActions from "./MessageActions";
 import ReplyPreview from "./ReplyPreview";
 import ReactionDetails from "./ReactionDetails";
@@ -18,10 +18,13 @@ function ChatWindow({
   onDeleteForMe,
   onDeleteForEveryone,
   onEdit,
+  searchQuery = "",
 }) {
   const endRef = useRef(null);
+  const containerRef = useRef(null);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [showReactionDetails, setShowReactionDetails] = useState(null); // { messageId, placement }
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   useEffect(() => {
     const handleGlobalClick = () => {
@@ -31,11 +34,21 @@ function ChatWindow({
     return () => document.removeEventListener("click", handleGlobalClick);
   }, [showReactionDetails]);
 
-  useEffect(() => {
+  const scrollToBottom = () => {
     if (endRef.current) {
       endRef.current.scrollIntoView({ behavior: "smooth" });
     }
+  };
+
+  useEffect(() => {
+    scrollToBottom();
   }, [messages]);
+
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
+    setShowScrollBottom(!isNearBottom);
+  };
 
   const formatMessageTime = (timestamp) => {
     try {
@@ -111,6 +124,27 @@ function ChatWindow({
     return Object.values(grouped);
   };
 
+  const highlightText = (text, query) => {
+    if (!query || typeof text !== "string") return text;
+    const parts = text.split(new RegExp(`(${query})`, "gi"));
+    return (
+      <>
+        {parts.map((part, i) =>
+          part.toLowerCase() === query.toLowerCase() ? (
+            <mark
+              key={i}
+              className="bg-yellow-200 dark:bg-yellow-800/60 rounded-sm text-inherit px-0.5"
+            >
+              {part}
+            </mark>
+          ) : (
+            part
+          ),
+        )}
+      </>
+    );
+  };
+
   const handleCopy = () => {
     toast.success("Copied to clipboard");
   };
@@ -150,7 +184,11 @@ function ChatWindow({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 bg-neutral-100 dark:bg-neutral-900 scroll-smooth">
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto p-4 bg-neutral-100 dark:bg-neutral-900 scroll-smooth relative"
+    >
       {loading ? (
         <div className="flex justify-center items-center h-full">
           <div className="animate-pulse flex space-x-2">
@@ -332,7 +370,7 @@ function ChatWindow({
                                     : "message-received rounded-bl-none"
                                 } ${message.replyTo ? "rounded-t-none" : ""}`}
                               >
-                                {message.content}
+                                {highlightText(message.content, searchQuery)}
                                 {message.isEdited && (
                                   <span className="ml-2 text-[10px] opacity-60">
                                     (edited)
@@ -448,17 +486,21 @@ function ChatWindow({
                                   !
                                 </span>
                               ) : (
-                                <div className="flex -space-x-1 items-end">
-                                  <span
-                                    className={`text-[10px] font-bold ${message.isRead ? "text-primary-500" : "text-neutral-400"}`}
-                                  >
-                                    ✓
-                                  </span>
-                                  <span
-                                    className={`text-[10px] font-bold ${message.isRead ? "text-primary-500" : "hidden"}`}
-                                  >
-                                    ✓
-                                  </span>
+                                <div className="flex items-center ml-1">
+                                  {message.isRead ? (
+                                    <div className="flex -space-x-1.5">
+                                      <span className="text-[10px] font-black text-primary-500">
+                                        ✓
+                                      </span>
+                                      <span className="text-[10px] font-black text-primary-500">
+                                        ✓
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] font-black text-neutral-400">
+                                      ✓
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </span>
@@ -484,6 +526,22 @@ function ChatWindow({
           <div ref={endRef} className="h-4" />
         </div>
       )}
+
+      {/* Floating Scroll to Bottom Button */}
+      <AnimatePresence>
+        {showScrollBottom && (
+          <motion.button
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.8 }}
+            onClick={scrollToBottom}
+            className="fixed bottom-24 right-8 z-30 p-3 bg-white dark:bg-neutral-800 text-primary-500 rounded-full shadow-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-all group"
+            title="Scroll to bottom"
+          >
+            <FaArrowDown className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Image Lightbox */}
       <AnimatePresence>

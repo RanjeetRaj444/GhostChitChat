@@ -19,6 +19,7 @@ function ChatPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
 
   const {
     isUserOnline,
@@ -221,6 +222,8 @@ function ChatPage() {
             onOpenProfile={() => setShowProfileModal(true)}
             currentUser={currentUser}
             isUserOnline={isUserOnline}
+            isUserTyping={isUserTyping}
+            getGroupTypingUsers={getGroupTypingUsers}
             darkMode={darkMode}
             toggleTheme={toggleTheme}
             // Group props
@@ -250,6 +253,8 @@ function ChatPage() {
                     isOnline={isUserOnline(selectedUser._id)}
                     isTyping={isUserTyping(selectedUser._id)}
                     onBack={() => setSelectedUser(null)}
+                    onOpenProfile={() => setShowProfileModal(true)}
+                    onSearch={setChatSearchQuery}
                   />
                 ) : (
                   <GroupChatHeader
@@ -258,6 +263,7 @@ function ChatPage() {
                     onBack={() => setSelectedGroup(null)}
                     onOpenInfo={() => setShowGroupInfoModal(true)}
                     onlineCount={getOnlineCount()}
+                    onSearch={setChatSearchQuery}
                   />
                 )}
 
@@ -272,6 +278,7 @@ function ChatPage() {
                   onDeleteForMe={handleDeleteForMe}
                   onDeleteForEveryone={handleDeleteForEveryone}
                   onEdit={handleEdit}
+                  searchQuery={chatSearchQuery}
                 />
 
                 <ChatInput

@@ -21,6 +21,8 @@ function Sidebar({
   onOpenProfile,
   currentUser,
   isUserOnline,
+  isUserTyping,
+  getGroupTypingUsers,
   darkMode,
   toggleTheme,
   // Group props
@@ -258,21 +260,27 @@ function Sidebar({
                             </div>
 
                             <div className="flex items-center justify-between">
-                              <p
-                                className={`text-xs truncate max-w-[85%] ${
-                                  conversation.unreadCount > 0
-                                    ? "text-neutral-800 dark:text-neutral-300 font-bold"
-                                    : "text-neutral-500 dark:text-neutral-500"
-                                }`}
-                              >
-                                {conversation.lastMessage.sender ===
-                                currentUser._id ? (
-                                  <span className="text-primary-500 mr-1 opacity-70">
-                                    You:
-                                  </span>
-                                ) : null}
-                                {conversation.lastMessage.content}
-                              </p>
+                              {isUserTyping(conversation.user._id) ? (
+                                <p className="text-xs text-primary-600 dark:text-primary-400 font-bold animate-pulse">
+                                  typing...
+                                </p>
+                              ) : (
+                                <p
+                                  className={`text-xs truncate max-w-[85%] ${
+                                    conversation.unreadCount > 0
+                                      ? "text-neutral-800 dark:text-neutral-300 font-bold"
+                                      : "text-neutral-500 dark:text-neutral-500"
+                                  }`}
+                                >
+                                  {conversation.lastMessage.sender ===
+                                  currentUser._id ? (
+                                    <span className="text-primary-500 mr-1 opacity-70">
+                                      You:
+                                    </span>
+                                  ) : null}
+                                  {conversation.lastMessage.content}
+                                </p>
+                              )}
 
                               {conversation.unreadCount > 0 && (
                                 <motion.span
@@ -325,8 +333,10 @@ function Sidebar({
                             <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-100">
                               {user.username}
                             </h3>
-                            <p className="text-[11px] text-neutral-500 dark:text-neutral-500 font-medium">
-                              New connection
+                            <p className="text-[11px] text-neutral-500 dark:text-neutral-500 font-medium font-mono leading-none">
+                              {isUserTyping(user._id)
+                                ? "typing..."
+                                : "New connection"}
                             </p>
                           </div>
 
@@ -430,31 +440,37 @@ function Sidebar({
                             </div>
 
                             <div className="flex items-center justify-between">
-                              <p
-                                className={`text-xs truncate max-w-[85%] ${
-                                  group.unreadCount > 0
-                                    ? "text-neutral-800 dark:text-neutral-300 font-bold"
-                                    : "text-neutral-500 dark:text-neutral-500"
-                                }`}
-                              >
-                                {group.lastMessage ? (
-                                  <>
-                                    <span className="font-medium">
-                                      {group.lastMessage.sender?._id ===
-                                      currentUser._id
-                                        ? "You"
-                                        : group.lastMessage.sender?.username}
-                                      :
-                                    </span>{" "}
-                                    {group.lastMessage.content}
-                                  </>
-                                ) : (
-                                  <span className="text-neutral-400 italic">
-                                    No messages yet
-                                  </span>
-                                )}
-                              </p>
-
+                              {getGroupTypingUsers(group._id).length > 0 ? (
+                                <p className="text-xs text-secondary-600 dark:text-secondary-400 font-bold animate-pulse">
+                                  {getGroupTypingUsers(group._id)[0]} is
+                                  typing...
+                                </p>
+                              ) : (
+                                <p
+                                  className={`text-xs truncate max-w-[85%] ${
+                                    group.unreadCount > 0
+                                      ? "text-neutral-800 dark:text-neutral-300 font-bold"
+                                      : "text-neutral-500 dark:text-neutral-500"
+                                  }`}
+                                >
+                                  {group.lastMessage ? (
+                                    <>
+                                      <span className="font-medium">
+                                        {group.lastMessage.sender?._id ===
+                                        currentUser._id
+                                          ? "You"
+                                          : group.lastMessage.sender?.username}
+                                        :
+                                      </span>{" "}
+                                      {group.lastMessage.content}
+                                    </>
+                                  ) : (
+                                    <span className="text-neutral-400 italic">
+                                      No messages yet
+                                    </span>
+                                  )}
+                                </p>
+                              )}
                               {group.unreadCount > 0 && (
                                 <motion.span
                                   initial={{ scale: 0 }}

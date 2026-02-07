@@ -116,38 +116,46 @@ export const socketHandler = (io) => {
 
     socket.on("message_reaction", (data) => {
       const { messageId, emoji, userId, receiverId, username, action } = data;
+      const senderId = socket.userId;
 
-      // Send reaction update to receiver
-      const receiverSockets = connectedUsers.get(receiverId);
-      if (receiverSockets) {
-        receiverSockets.forEach((sockId) =>
-          io.to(sockId).emit("message_reaction_update", {
-            messageId,
-            emoji,
-            userId,
-            username,
-            action, // 'add' or 'remove'
-          }),
-        );
-      }
+      // Notify both participants for multi-device sync
+      [receiverId, senderId].forEach((id) => {
+        if (!id) return;
+        const sockets = connectedUsers.get(id);
+        if (sockets) {
+          sockets.forEach((sockId) => {
+            io.to(sockId).emit("message_reaction_update", {
+              messageId,
+              emoji,
+              userId,
+              username,
+              action,
+            });
+          });
+        }
+      });
     });
 
     // ==================== DELETE EVENTS ====================
 
     socket.on("message_deleted", (data) => {
       const { messageId, receiverId, deleteType } = data;
+      const senderId = socket.userId;
 
-      // If deleted for everyone, notify the receiver
       if (deleteType === "everyone") {
-        const receiverSockets = connectedUsers.get(receiverId);
-        if (receiverSockets) {
-          receiverSockets.forEach((sockId) =>
-            io.to(sockId).emit("message_deleted_update", {
-              messageId,
-              deleteType,
-            }),
-          );
-        }
+        // Notify both participants
+        [receiverId, senderId].forEach((id) => {
+          if (!id) return;
+          const sockets = connectedUsers.get(id);
+          if (sockets) {
+            sockets.forEach((sockId) => {
+              io.to(sockId).emit("message_deleted_update", {
+                messageId,
+                deleteType,
+              });
+            });
+          }
+        });
       }
     });
 
@@ -155,17 +163,22 @@ export const socketHandler = (io) => {
 
     socket.on("message_edited", (data) => {
       const { messageId, content, receiverId, editedAt } = data;
+      const senderId = socket.userId;
 
-      const receiverSockets = connectedUsers.get(receiverId);
-      if (receiverSockets) {
-        receiverSockets.forEach((sockId) =>
-          io.to(sockId).emit("message_edited_update", {
-            messageId,
-            content,
-            editedAt,
-          }),
-        );
-      }
+      // Notify both participants
+      [receiverId, senderId].forEach((id) => {
+        if (!id) return;
+        const sockets = connectedUsers.get(id);
+        if (sockets) {
+          sockets.forEach((sockId) => {
+            io.to(sockId).emit("message_edited_update", {
+              messageId,
+              content,
+              editedAt,
+            });
+          });
+        }
+      });
     });
 
     // ==================== GROUP EVENTS ====================
