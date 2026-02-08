@@ -14,6 +14,7 @@ import GroupChatHeader from "../components/GroupChatHeader";
 import GroupInfoModal from "../components/GroupInfoModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import ClearChatModal from "../components/ClearChatModal";
+import ContactInfoPanel from "../components/ContactInfoPanel";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 
@@ -21,7 +22,11 @@ function ChatPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [showContactInfoModal, setShowContactInfoModal] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // Use a counter for scroll trigger to allow multiple Enter presses
+  const [scrollTrigger, setScrollTrigger] = useState(0);
   const [contactToDelete, setContactToDelete] = useState(null);
   const [isDeletingContact, setIsDeletingContact] = useState(false);
   const [clearingTarget, setClearingTarget] = useState(null); // { id: string, type: 'private' | 'group' }
@@ -309,168 +314,216 @@ function ChatPage() {
           />
         </motion.div>
 
-        <main
-          className={`flex-1 flex flex-col overflow-hidden ${hasActiveChat ? "flex" : "hidden md:flex"}`}
-        >
-          <AnimatePresence mode="wait">
-            {hasActiveChat ? (
-              <motion.div
-                key={selectedUser?._id || selectedGroup?._id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="flex-1 flex flex-col overflow-hidden"
-              >
-                {selectedUser ? (
-                  <ChatHeader
-                    user={selectedUser}
-                    isOnline={isUserOnline(selectedUser._id)}
-                    isTyping={isUserTyping(selectedUser._id)}
-                    onBack={() => setSelectedUser(null)}
-                    onOpenProfile={() => setShowProfileModal(true)}
-                    onSearch={setChatSearchQuery}
-                    onBlock={blockUser}
-                    onUnblock={unblockUser}
-                    onClearChat={(userId) =>
-                      setClearingTarget({ id: userId, type: "private" })
-                    }
-                    onDeleteChat={(user) => setContactToDelete(user)}
-                    onMute={muteUser}
-                    onFavorite={toggleFavorite}
+        {/* Main content area with optional Contact Info Panel */}
+        <div className="flex-1 flex overflow-hidden">
+          <main
+            className={`flex-1 flex flex-col overflow-hidden ${hasActiveChat ? "flex" : "hidden md:flex"}`}
+          >
+            <AnimatePresence mode="wait">
+              {hasActiveChat ? (
+                <motion.div
+                  key={selectedUser?._id || selectedGroup?._id || "active-chat"}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex-1 flex flex-col overflow-hidden"
+                >
+                  {selectedUser ? (
+                    <ChatHeader
+                      user={selectedUser}
+                      isOnline={isUserOnline(selectedUser._id)}
+                      isTyping={isUserTyping(selectedUser._id)}
+                      onBack={() => setSelectedUser(null)}
+                      onOpenProfile={() => setShowContactInfoModal(true)}
+                      onSearch={setChatSearchQuery}
+                      onBlock={blockUser}
+                      onUnblock={unblockUser}
+                      onClearChat={(userId) =>
+                        setClearingTarget({ id: userId, type: "private" })
+                      }
+                      onDeleteChat={(user) => setContactToDelete(user)}
+                      onMute={muteUser}
+                      onFavorite={toggleFavorite}
+                      currentUser={currentUser}
+                      isSearchOpen={isSearchOpen}
+                      onSearchClose={() => setIsSearchOpen(false)}
+                      onScrollToResult={() =>
+                        setScrollTrigger((prev) => prev + 1)
+                      }
+                    />
+                  ) : (
+                    <GroupChatHeader
+                      group={selectedGroup}
+                      typingUsers={getGroupTypingUsers(selectedGroup?._id)}
+                      onBack={() => setSelectedGroup(null)}
+                      onOpenInfo={() => setShowGroupInfoModal(true)}
+                      onlineCount={getOnlineCount()}
+                      onSearch={setChatSearchQuery}
+                      onClearChat={(groupId) =>
+                        setClearingTarget({ id: groupId, type: "group" })
+                      }
+                      onDeleteChat={deleteGroup}
+                      onMute={muteGroup}
+                      onFavorite={toggleGroupFavorite}
+                      currentUser={currentUser}
+                    />
+                  )}
+
+                  <ChatWindow
+                    messages={currentMessages}
                     currentUser={currentUser}
+                    selectedUser={selectedUser}
+                    loading={currentLoading}
+                    isGroup={!!selectedGroup}
+                    onReply={handleReply}
+                    onReact={handleReact}
+                    onDeleteForMe={handleDeleteForMe}
+                    onDeleteForEveryone={handleDeleteForEveryone}
+                    onEdit={handleEdit}
+                    onToggleStar={selectedGroup ? toggleGroupStar : toggleStar}
+                    searchQuery={chatSearchQuery}
+                    scrollTrigger={scrollTrigger}
                   />
-                ) : (
-                  <GroupChatHeader
-                    group={selectedGroup}
-                    typingUsers={getGroupTypingUsers(selectedGroup?._id)}
-                    onBack={() => setSelectedGroup(null)}
-                    onOpenInfo={() => setShowGroupInfoModal(true)}
-                    onlineCount={getOnlineCount()}
-                    onSearch={setChatSearchQuery}
-                    onClearChat={(groupId) =>
-                      setClearingTarget({ id: groupId, type: "group" })
-                    }
-                    onDeleteChat={deleteGroup}
-                    onMute={muteGroup}
-                    onFavorite={toggleGroupFavorite}
-                    currentUser={currentUser}
+
+                  <ChatInput
+                    onSendMessage={handleSendMessage}
+                    onSendImage={handleSendImage}
+                    onTyping={handleTyping}
+                    replyTo={currentReplyTo}
+                    onCancelReply={handleCancelReply}
+                    editingMessage={currentEditingMessage}
+                    onCancelEdit={handleCancelEdit}
+                    onEditMessage={handleEditMessage}
+                    isBlocked={selectedUser?.blockedByMe}
+                    hasBlockedMe={selectedUser?.hasBlockedMe}
                   />
-                )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty-state"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-neutral-50/50 dark:bg-neutral-900/50"
+                >
+                  {/* Decorative Background Elements */}
+                  <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.1, 1],
+                        x: [0, 30, 0],
+                        y: [0, -50, 0],
+                      }}
+                      transition={{
+                        duration: 10,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                      className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary-500/10 rounded-full blur-3xl"
+                    ></motion.div>
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.2, 1],
+                        x: [0, -40, 0],
+                        y: [0, 40, 0],
+                      }}
+                      transition={{
+                        duration: 12,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: 2,
+                      }}
+                      className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-secondary-500/10 rounded-full blur-3xl"
+                    ></motion.div>
+                  </div>
 
-                <ChatWindow
-                  messages={currentMessages}
-                  currentUser={currentUser}
-                  selectedUser={selectedUser}
-                  loading={currentLoading}
-                  isGroup={!!selectedGroup}
-                  onReply={handleReply}
-                  onReact={handleReact}
-                  onDeleteForMe={handleDeleteForMe}
-                  onDeleteForEveryone={handleDeleteForEveryone}
-                  onEdit={handleEdit}
-                  onToggleStar={selectedGroup ? toggleGroupStar : toggleStar}
-                  searchQuery={chatSearchQuery}
-                />
+                  <div className="relative z-10 max-w-2xl px-6">
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="mb-8 flex justify-center"
+                    >
+                      <div className="bg-white dark:bg-neutral-800 p-6 rounded-2xl shadow-xl shadow-primary-500/10 ring-1 ring-black/5 dark:ring-white/10">
+                        <img
+                          src="/vite.svg"
+                          alt="Logo"
+                          className="w-20 h-20 opacity-80"
+                        />
+                      </div>
+                    </motion.div>
 
-                <ChatInput
-                  onSendMessage={handleSendMessage}
-                  onSendImage={handleSendImage}
-                  onTyping={handleTyping}
-                  replyTo={currentReplyTo}
-                  onCancelReply={handleCancelReply}
-                  editingMessage={currentEditingMessage}
-                  onCancelEdit={handleCancelEdit}
-                  onEditMessage={handleEditMessage}
-                  isBlocked={selectedUser?.blockedByMe}
-                  hasBlockedMe={selectedUser?.hasBlockedMe}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-neutral-50/50 dark:bg-neutral-900/50"
-              >
-                {/* Decorative Background Elements */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.1, 1],
-                      x: [0, 30, 0],
-                      y: [0, -50, 0],
-                    }}
-                    transition={{
-                      duration: 10,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary-500/10 rounded-full blur-3xl"
-                  ></motion.div>
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.2, 1],
-                      x: [0, -40, 0],
-                      y: [0, 40, 0],
-                    }}
-                    transition={{
-                      duration: 12,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      delay: 2,
-                    }}
-                    className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-secondary-500/10 rounded-full blur-3xl"
-                  ></motion.div>
-                </div>
+                    <motion.h1
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-white mb-6 tracking-tight"
+                    >
+                      Welcome to{" "}
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-400 dark:to-secondary-400">
+                        G-ChitChat
+                      </span>
+                    </motion.h1>
 
-                <div className="relative z-10 max-w-2xl px-6">
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="mb-8 flex justify-center"
-                  >
-                    <div className="bg-white dark:bg-neutral-800 p-6 rounded-2xl shadow-xl shadow-primary-500/10 ring-1 ring-black/5 dark:ring-white/10">
-                      <img
-                        src="/vite.svg"
-                        alt="Logo"
-                        className="w-20 h-20 opacity-80"
-                      />
-                    </div>
-                  </motion.div>
+                    <motion.p
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-xl text-neutral-600 dark:text-neutral-300 mb-10 max-w-lg mx-auto leading-relaxed"
+                    >
+                      Connect freely, chat securely. Select a conversation from
+                      the sidebar to start talking, or create a group to chat
+                      with multiple friends.
+                    </motion.p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </main>
 
-                  <motion.h1
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-white mb-6 tracking-tight"
-                  >
-                    Welcome to{" "}
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-400 dark:to-secondary-400">
-                     G-ChitChat
-                    </span>
-                  </motion.h1>
-
-                  <motion.p
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="text-xl text-neutral-600 dark:text-neutral-300 mb-10 max-w-lg mx-auto leading-relaxed"
-                  >
-                    Connect freely, chat securely. Select a conversation from
-                    the sidebar to start talking, or create a group to chat with
-                    multiple friends.
-                  </motion.p>
-                </div>
-              </motion.div>
+          {/* Contact Info Panel - Slide-in from right */}
+          <AnimatePresence>
+            {showContactInfoModal && selectedUser && (
+              <ContactInfoPanel
+                key="contact-info-panel"
+                user={selectedUser}
+                currentUser={currentUser}
+                onClose={() => setShowContactInfoModal(false)}
+                onBlock={blockUser}
+                onUnblock={unblockUser}
+                onMute={muteUser}
+                onFavorite={toggleFavorite}
+                onClearChat={(userId) =>
+                  setClearingTarget({ id: userId, type: "private" })
+                }
+                onDeleteChat={(user) => {
+                  setShowContactInfoModal(false);
+                  setContactToDelete(user);
+                }}
+                onSearch={() => {
+                  setShowContactInfoModal(false);
+                  setIsSearchOpen(true);
+                }}
+                isOnline={isUserOnline(selectedUser._id)}
+                messages={messages}
+                groups={groups}
+                users={users}
+                onCreateGroup={createGroup}
+                onSelectGroup={(group) => {
+                  setShowContactInfoModal(false);
+                  setSelectedUser(null);
+                  setSelectedGroup(group);
+                }}
+              />
             )}
           </AnimatePresence>
-        </main>
+        </div>
       </div>
 
       <AnimatePresence>
         {showProfileModal && (
           <UserProfileModal
+            key="profile-modal"
             user={currentUser}
             onClose={() => setShowProfileModal(false)}
             onUpdate={() => setShowProfileModal(false)}
@@ -479,6 +532,7 @@ function ChatPage() {
 
         {showCreateGroupModal && (
           <CreateGroupModal
+            key="create-group-modal"
             users={users}
             currentUserId={currentUser._id}
             onClose={() => setShowCreateGroupModal(false)}
@@ -488,6 +542,7 @@ function ChatPage() {
 
         {showGroupInfoModal && selectedGroup && (
           <GroupInfoModal
+            key="group-info-modal"
             group={selectedGroup}
             currentUserId={currentUser._id}
             users={users}
@@ -502,25 +557,31 @@ function ChatPage() {
         )}
 
         {/* Delete Contact Confirmation Modal */}
-        <ConfirmationModal
-          isOpen={!!contactToDelete}
-          onClose={() => setContactToDelete(null)}
-          onConfirm={handleRemoveContact}
-          title="Delete Contact?"
-          message={`Are you sure you want to remove ${contactToDelete?.username} from your contacts? This will permanently delete your entire chat history, including all messages and media files. This action cannot be undone.`}
-          confirmText="Delete Everything"
-          cancelText="Cancel"
-          isDanger={true}
-          loading={isDeletingContact}
-        />
+        {!!contactToDelete && (
+          <ConfirmationModal
+            key="delete-contact-modal"
+            isOpen={!!contactToDelete}
+            onClose={() => setContactToDelete(null)}
+            onConfirm={handleRemoveContact}
+            title="Delete Contact?"
+            message={`Are you sure you want to remove ${contactToDelete?.username} from your contacts? This will permanently delete your entire chat history, including all messages and media files. This action cannot be undone.`}
+            confirmText="Delete Everything"
+            cancelText="Cancel"
+            isDanger={true}
+            loading={isDeletingContact}
+          />
+        )}
 
         {/* Clear Chat Confirmation Modal */}
-        <ClearChatModal
-          isOpen={!!clearingTarget}
-          onClose={() => setClearingTarget(null)}
-          onConfirm={handleClearChat}
-          loading={isClearingChat}
-        />
+        {!!clearingTarget && (
+          <ClearChatModal
+            key="clear-chat-modal"
+            isOpen={!!clearingTarget}
+            onClose={() => setClearingTarget(null)}
+            onConfirm={handleClearChat}
+            loading={isClearingChat}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

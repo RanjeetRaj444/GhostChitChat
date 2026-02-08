@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -15,6 +15,11 @@ import {
   FaBan,
   FaUnlock,
   FaBellSlash,
+  FaArchive,
+  FaThumbtack,
+  FaEnvelope,
+  FaEnvelopeOpen,
+  FaTimes,
 } from "react-icons/fa";
 
 function Sidebar({
@@ -43,6 +48,25 @@ function Sidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const [showAllUsers, setShowAllUsers] = useState(false);
   const [activeTab, setActiveTab] = useState("chats"); // "chats" or "groups"
+
+  // Close dropdown when clicking anywhere else
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Only close if clicking outside dropdown menus
+      const dropdownMenus = document.querySelectorAll("[data-dropdown-menu]");
+      let clickedInsideMenu = false;
+      dropdownMenus.forEach((menu) => {
+        if (menu.contains(event.target)) {
+          clickedInsideMenu = true;
+        }
+      });
+      if (!clickedInsideMenu && activeDropdown) {
+        setActiveDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [activeDropdown]);
 
   // Filter conversations by search query
   const filteredConversations = conversations.filter((conv) =>
@@ -97,7 +121,7 @@ function Sidebar({
       {/* Header */}
       <div className="p-4 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
         <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-500 dark:to-secondary-500">
-         G-ChitChat
+          G-ChitChat
         </h1>
 
         <div className="flex space-x-1">
@@ -356,6 +380,7 @@ function Sidebar({
                                   ></div>
 
                                   <motion.div
+                                    data-dropdown-menu
                                     initial={{
                                       opacity: 0,
                                       scale: 0.95,
@@ -363,8 +388,63 @@ function Sidebar({
                                     }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                    className="absolute right-0 top-full mt-2 w-44 bg-white dark:bg-neutral-800 rounded-2xl shadow-2xl border border-neutral-100 dark:border-neutral-700 z-[90] py-2 overflow-hidden shadow-neutral-900/10 dark:shadow-black/50"
+                                    className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-neutral-800 rounded-2xl shadow-2xl border border-neutral-100 dark:border-neutral-700 z-[90] py-2 overflow-hidden shadow-neutral-900/10 dark:shadow-black/50"
                                   >
+                                    {/* Archive chat */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(null);
+                                        // TODO: Implement archive functionality
+                                        import("react-hot-toast").then(
+                                          ({ default: toast }) => {
+                                            toast.success("Chat archived");
+                                          },
+                                        );
+                                      }}
+                                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                                    >
+                                      <FaArchive className="w-3.5 h-3.5 mr-3 opacity-70" />
+                                      Archive chat
+                                    </button>
+
+                                    {/* Pin chat */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(null);
+                                        // TODO: Implement pin functionality
+                                        import("react-hot-toast").then(
+                                          ({ default: toast }) => {
+                                            toast.success("Chat pinned");
+                                          },
+                                        );
+                                      }}
+                                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                                    >
+                                      <FaThumbtack className="w-3.5 h-3.5 mr-3 opacity-70" />
+                                      Pin chat
+                                    </button>
+
+                                    {/* Mark as unread */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(null);
+                                        // TODO: Implement mark as unread
+                                        import("react-hot-toast").then(
+                                          ({ default: toast }) => {
+                                            toast.success("Marked as unread");
+                                          },
+                                        );
+                                      }}
+                                      className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                                    >
+                                      <FaEnvelope className="w-3.5 h-3.5 mr-3 opacity-70" />
+                                      Mark as unread
+                                    </button>
+
+                                    {/* Block/Unblock */}
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -383,17 +463,45 @@ function Sidebar({
                                     >
                                       {conversation.user.blockedByMe ? (
                                         <>
-                                          <FaUnlock className="w-3 h-3 mr-2.5" />
+                                          <FaUnlock className="w-3.5 h-3.5 mr-3" />
                                           Unblock
                                         </>
                                       ) : (
                                         <>
-                                          <FaBan className="w-3 h-3 mr-2.5" />
+                                          <FaBan className="w-3.5 h-3.5 mr-3 opacity-70" />
                                           Block
                                         </>
                                       )}
                                     </button>
 
+                                    {/* Divider - only show if chat is open */}
+                                    {selectedUser?._id ===
+                                      conversation.user._id && (
+                                      <div className="my-1.5 border-t border-neutral-100 dark:border-neutral-700" />
+                                    )}
+
+                                    {/* Close chat - only show if this chat is currently open */}
+                                    {selectedUser?._id ===
+                                      conversation.user._id && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveDropdown(null);
+                                          onSelectUser(null);
+                                          import("react-hot-toast").then(
+                                            ({ default: toast }) => {
+                                              toast.success("Chat closed");
+                                            },
+                                          );
+                                        }}
+                                        className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                                      >
+                                        <FaTimes className="w-3.5 h-3.5 mr-3 opacity-70" />
+                                        Close chat
+                                      </button>
+                                    )}
+
+                                    {/* Delete chat */}
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -402,8 +510,8 @@ function Sidebar({
                                       }}
                                       className="w-full flex items-center px-4 py-2.5 text-xs font-bold text-error-500 hover:bg-error-50 dark:hover:bg-error-500/10 transition-colors"
                                     >
-                                      <FaTrash className="w-3 h-3 mr-2.5" />
-                                      Delete
+                                      <FaTrash className="w-3.5 h-3.5 mr-3" />
+                                      Delete chat
                                     </button>
                                   </motion.div>
                                 </>

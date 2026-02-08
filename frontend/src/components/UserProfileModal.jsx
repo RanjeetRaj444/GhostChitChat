@@ -81,8 +81,14 @@ function UserProfileModal({ user, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl w-[95%] sm:w-full max-w-md animate-slide-up">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl w-[95%] sm:w-full max-w-md animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
           <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
             Your Profile

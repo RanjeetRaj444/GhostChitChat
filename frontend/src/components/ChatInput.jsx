@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { FaPaperPlane, FaSmile, FaImage, FaTimes } from "react-icons/fa";
+import { FaPaperPlane, FaSmile, FaImage, FaTimes, FaBan } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import ReplyPreview from "./ReplyPreview";

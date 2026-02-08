@@ -82,4 +82,21 @@
       @apply bg-primary-500/20 dark:bg-primary-500/30;
     }
   }
+
+  .search-highlight-flash {
+    animation: search-flash 2s ease-out;
+  }
+
+  @keyframes search-flash {
+    0% {
+      @apply bg-transparent;
+    }
+    10%,
+    90% {
+      @apply bg-primary-500/20 dark:bg-primary-500/30 rounded-2xl;
+    }
+    100% {
+      @apply bg-transparent;
+    }
+  }
 }

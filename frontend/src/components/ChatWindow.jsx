@@ -20,9 +20,11 @@ function ChatWindow({
   onEdit,
   onToggleStar,
   searchQuery = "",
+  scrollTrigger = 0,
 }) {
   const endRef = useRef(null);
   const containerRef = useRef(null);
+  const messageRefs = useRef({});
   const [lightboxImage, setLightboxImage] = useState(null);
   const [showReactionDetails, setShowReactionDetails] = useState(null); // { messageId, placement }
   const [showScrollBottom, setShowScrollBottom] = useState(false);
@@ -44,6 +46,34 @@ function ChatWindow({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Scroll to first matching message when triggered
+  useEffect(() => {
+    if (scrollTrigger > 0 && searchQuery.trim()) {
+      const firstMatch = messages.find(
+        (msg) =>
+          msg.content &&
+          msg.content.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
+      if (firstMatch && messageRefs.current[firstMatch._id]) {
+        messageRefs.current[firstMatch._id].scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        // Flash effect
+        messageRefs.current[firstMatch._id].classList.add(
+          "search-highlight-flash",
+        );
+        setTimeout(() => {
+          messageRefs.current[firstMatch._id]?.classList.remove(
+            "search-highlight-flash",
+          );
+        }, 2000);
+      } else if (searchQuery.trim()) {
+        toast("No messages found", { icon: "🔍" });
+      }
+    }
+  }, [scrollTrigger, searchQuery, messages]);
 
   const handleScroll = (e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -245,6 +275,9 @@ function ChatWindow({
                     <motion.div
                       id={`message-${message._id}`}
                       key={message._id || message.createdAt + idx}
+                      ref={(el) => {
+                        if (el) messageRefs.current[message._id] = el;
+                      }}
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{
@@ -278,7 +311,7 @@ function ChatWindow({
                       <div className={`flex flex-col max-w-[75%] relative`}>
                         {/* Show sender name in groups for messages not sent by current user */}
                         {isGroup && !isSentByCurrentUser && (
-                          <span className="text-xs font-semibold text-primary-500 dark:text-primary-400 mb-1 ml-1">
+                          <span className="text-xs font-semibold text-primary-500 dark:text-primary-400 mb-1 ml-1 flex items-start">
                             {senderName}
                           </span>
                         )}
@@ -401,24 +434,22 @@ function ChatWindow({
                             ) : (
                               <motion.div
                                 layout
-                                className={`message-bubble relative ${
+                                className={`message-bubble inline-flex flex-wrap items-end gap-x-2 ${
                                   isSentByCurrentUser
                                     ? "message-sent rounded-br-none"
                                     : "message-received rounded-bl-none"
                                 } ${message.replyTo ? "rounded-t-none" : ""}`}
                               >
-                                <div className="pr-4 pb-2">
+                                <span>
                                   {highlightText(message.content, searchQuery)}
                                   {message.isEdited && (
-                                    <span className="ml-2 text-[10px] opacity-60">
+                                    <span className="ml-1 text-[10px] opacity-60">
                                       (edited)
                                     </span>
                                   )}
-                                </div>
+                                </span>
 
-                                <div
-                                  className={`absolute bottom-1 right-2 flex items-center gap-1.5`}
-                                >
+                                <span className="inline-flex items-center gap-1 ml-auto self-end">
                                   {message.starredBy?.some(
                                     (id) =>
                                       (id._id || id).toString() ===
@@ -432,28 +463,26 @@ function ChatWindow({
                                     {formatMessageTime(message.createdAt)}
                                   </span>
                                   {isSentByCurrentUser && (
-                                    <div className="flex items-center h-3">
+                                    <span className="inline-flex items-center h-3">
                                       {message.isSending ? (
-                                        <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                       ) : (
-                                        <div className="flex -space-x-1">
+                                        <span className="inline-flex -space-x-1">
                                           <span
-                                            className={`text-[10px] font-black ${message.isRead ? (isSentByCurrentUser ? "text-primary-200" : "text-primary-500") : "text-white/60"}`}
+                                            className={`text-[10px] font-black ${message.isRead ? "text-primary-200" : "text-white/60"}`}
                                           >
                                             ✓
                                           </span>
                                           {message.isRead && (
-                                            <span
-                                              className={`text-[10px] font-black ${isSentByCurrentUser ? "text-primary-200" : "text-primary-500"}`}
-                                            >
+                                            <span className="text-[10px] font-black text-primary-200">
                                               ✓
                                             </span>
                                           )}
-                                        </div>
+                                        </span>
                                       )}
-                                    </div>
+                                    </span>
                                   )}
-                                </div>
+                                </span>
                               </motion.div>
                             )}
                           </div>

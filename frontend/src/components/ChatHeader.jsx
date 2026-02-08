@@ -35,13 +35,23 @@ function ChatHeader({
   onMute,
   onFavorite,
   currentUser,
+  isSearchOpen,
+  onSearchClose,
+  onScrollToResult,
 }) {
-  const [isSearching, setIsSearching] = useState(false);
+  const [isSearching, setIsSearching] = useState(isSearchOpen || false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showMenu, setShowMenu] = useState(false);
   const [showCallMenu, setShowCallMenu] = useState(false);
   const menuRef = useRef(null);
   const callMenuRef = useRef(null);
+
+  // Sync external isSearchOpen with internal state
+  useEffect(() => {
+    if (isSearchOpen) {
+      setIsSearching(true);
+    }
+  }, [isSearchOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -63,9 +73,16 @@ function ChatHeader({
     onSearch?.(val);
   };
 
+  const handleSearchSubmit = (e) => {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      onScrollToResult?.();
+    }
+  };
+
   const toggleSearch = () => {
     if (isSearching) {
       handleSearchChange("");
+      onSearchClose?.();
     }
     setIsSearching(!isSearching);
   };
@@ -152,6 +169,7 @@ function ChatHeader({
                 placeholder="Search in conversation..."
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={handleSearchSubmit}
                 className="w-full bg-neutral-100 dark:bg-neutral-700 border-none rounded-xl pl-9 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary-500/30 outline-none transition-all"
               />
             </div>
