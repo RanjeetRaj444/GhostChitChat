@@ -101,7 +101,15 @@ export const useChat = () => {
       setConversations((prev) => {
         let idx = prev.findIndex((c) => c.user._id === otherUserId);
         const messageContent =
-          data.messageType === "image" ? "📷 Image" : data.message;
+          data.messageType === "image"
+            ? "📷 Image"
+            : data.messageType === "video"
+              ? "🎥 Video"
+              : data.messageType === "audio"
+                ? "🎵 Audio"
+                : data.messageType === "file"
+                  ? "📄 Document"
+                  : data.message;
         const newMsgForConv = {
           content: messageContent,
           createdAt: data.timestamp,
@@ -146,6 +154,10 @@ export const useChat = () => {
               content: data.message || "",
               messageType: data.messageType || "text",
               imageUrl: data.imageUrl || null,
+              videoUrl: data.videoUrl || null,
+              audioUrl: data.audioUrl || null,
+              fileUrl: data.fileUrl || null,
+              fileName: data.fileName || null,
               replyTo: data.replyTo || null,
               reactions: [],
               sender: {
@@ -393,6 +405,238 @@ export const useChat = () => {
         ),
       );
       toast.error("Failed to send image");
+    }
+  };
+
+  const sendVideo = async (videoFile, replyToId = null) => {
+    if (!selectedUser || !videoFile) return;
+
+    // Check file size (5MB limit)
+    if (videoFile.size > 5 * 1024 * 1024) {
+      toast.error("Video size must be less than 5MB");
+      return;
+    }
+
+    const tempId = Date.now().toString();
+    const localVideoUrl = URL.createObjectURL(videoFile);
+
+    const newMessage = {
+      _id: tempId,
+      content: "",
+      messageType: "video",
+      videoUrl: localVideoUrl,
+      replyTo: replyTo || null,
+      reactions: [],
+      sender: {
+        _id: currentUser._id,
+        username: currentUser.username,
+        avatar: currentUser.avatar || "/default-avatar.svg",
+      },
+      receiver: {
+        _id: selectedUser._id,
+        username: selectedUser.username,
+        avatar: selectedUser.avatar || "/default-avatar.svg",
+      },
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      isSending: true,
+      failed: false,
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+    setReplyTo(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("video", videoFile);
+      formData.append("receiverId", selectedUser._id);
+      if (replyToId || replyTo?._id) {
+        formData.append("replyToId", replyToId || replyTo._id);
+      }
+
+      const res = await api.post("/messages/video", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      URL.revokeObjectURL(localVideoUrl);
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId
+            ? { ...res.data, isSending: false, failed: false }
+            : msg,
+        ),
+      );
+
+      updateConversationList(selectedUser._id, "🎥 Video");
+      sendSocketMessage(selectedUser._id, "🎥 Video", res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "video",
+        videoUrl: res.data.videoUrl,
+      });
+    } catch (err) {
+      console.error("Send video error:", err);
+      URL.revokeObjectURL(localVideoUrl);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg,
+        ),
+      );
+      toast.error(err.response?.data?.message || "Failed to send video");
+    }
+  };
+
+  const sendAudio = async (audioFile, replyToId = null) => {
+    if (!selectedUser || !audioFile) return;
+
+    if (audioFile.size > 5 * 1024 * 1024) {
+      toast.error("Audio size must be less than 5MB");
+      return;
+    }
+
+    const tempId = Date.now().toString();
+    const localAudioUrl = URL.createObjectURL(audioFile);
+
+    const newMessage = {
+      _id: tempId,
+      content: "",
+      messageType: "audio",
+      audioUrl: localAudioUrl,
+      replyTo: replyTo || null,
+      reactions: [],
+      sender: {
+        _id: currentUser._id,
+        username: currentUser.username,
+        avatar: currentUser.avatar || "/default-avatar.svg",
+      },
+      receiver: {
+        _id: selectedUser._id,
+        username: selectedUser.username,
+        avatar: selectedUser.avatar || "/default-avatar.svg",
+      },
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      isSending: true,
+      failed: false,
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+    setReplyTo(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioFile);
+      formData.append("receiverId", selectedUser._id);
+      if (replyToId || replyTo?._id) {
+        formData.append("replyToId", replyToId || replyTo._id);
+      }
+
+      const res = await api.post("/messages/audio", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      URL.revokeObjectURL(localAudioUrl);
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId
+            ? { ...res.data, isSending: false, failed: false }
+            : msg,
+        ),
+      );
+
+      updateConversationList(selectedUser._id, "🎵 Audio");
+      sendSocketMessage(selectedUser._id, "🎵 Audio", res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "audio",
+        audioUrl: res.data.audioUrl,
+      });
+    } catch (err) {
+      console.error("Send audio error:", err);
+      URL.revokeObjectURL(localAudioUrl);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg,
+        ),
+      );
+      toast.error(err.response?.data?.message || "Failed to send audio");
+    }
+  };
+
+  const sendFile = async (file, replyToId = null) => {
+    if (!selectedUser || !file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+
+    const tempId = Date.now().toString();
+
+    const newMessage = {
+      _id: tempId,
+      content: "",
+      messageType: "file",
+      fileName: file.name,
+      fileUrl: null,
+      replyTo: replyTo || null,
+      reactions: [],
+      sender: {
+        _id: currentUser._id,
+        username: currentUser.username,
+        avatar: currentUser.avatar || "/default-avatar.svg",
+      },
+      receiver: {
+        _id: selectedUser._id,
+        username: selectedUser.username,
+        avatar: selectedUser.avatar || "/default-avatar.svg",
+      },
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      isSending: true,
+      failed: false,
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+    setReplyTo(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("receiverId", selectedUser._id);
+      if (replyToId || replyTo?._id) {
+        formData.append("replyToId", replyToId || replyTo._id);
+      }
+
+      const res = await api.post("/messages/file", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId
+            ? { ...res.data, isSending: false, failed: false }
+            : msg,
+        ),
+      );
+
+      updateConversationList(selectedUser._id, "📄 Document");
+      sendSocketMessage(selectedUser._id, "📄 Document", res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "file",
+        fileUrl: res.data.fileUrl,
+        fileName: res.data.fileName,
+      });
+    } catch (err) {
+      console.error("Send file error:", err);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg,
+        ),
+      );
+      toast.error(err.response?.data?.message || "Failed to send file");
     }
   };
 
@@ -723,5 +967,8 @@ export const useChat = () => {
     muteUser,
     toggleFavorite,
     toggleStar,
+    sendVideo,
+    sendAudio,
+    sendFile,
   };
 };

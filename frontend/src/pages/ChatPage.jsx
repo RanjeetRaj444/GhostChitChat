@@ -69,6 +69,9 @@ function ChatPage() {
     muteUser,
     toggleFavorite,
     toggleStar,
+    sendVideo,
+    sendAudio,
+    sendFile,
   } = useChat();
 
   // Group chat hooks
@@ -98,6 +101,9 @@ function ChatPage() {
     muteGroup,
     toggleGroupFavorite,
     toggleGroupStar,
+    sendGroupVideo,
+    sendGroupAudio,
+    sendGroupFile,
   } = useGroupChat();
 
   const handleTyping = (isTyping) => {
@@ -121,6 +127,30 @@ function ChatPage() {
       await sendImage(imageFile, replyToId);
     } else if (selectedGroup) {
       await sendGroupImage(imageFile, replyToId);
+    }
+  };
+
+  const handleSendVideo = async (videoFile, replyToId) => {
+    if (selectedUser) {
+      await sendVideo(videoFile, replyToId);
+    } else if (selectedGroup) {
+      await sendGroupVideo(videoFile, replyToId);
+    }
+  };
+
+  const handleSendAudio = async (audioFile, replyToId) => {
+    if (selectedUser) {
+      await sendAudio(audioFile, replyToId);
+    } else if (selectedGroup) {
+      await sendGroupAudio(audioFile, replyToId);
+    }
+  };
+
+  const handleSendFile = async (file, replyToId) => {
+    if (selectedUser) {
+      await sendFile(file, replyToId);
+    } else if (selectedGroup) {
+      await sendGroupFile(file, replyToId);
     }
   };
 
@@ -389,6 +419,9 @@ function ChatPage() {
                   <ChatInput
                     onSendMessage={handleSendMessage}
                     onSendImage={handleSendImage}
+                    onSendVideo={handleSendVideo}
+                    onSendAudio={handleSendAudio}
+                    onSendFile={handleSendFile}
                     onTyping={handleTyping}
                     replyTo={currentReplyTo}
                     onCancelReply={handleCancelReply}

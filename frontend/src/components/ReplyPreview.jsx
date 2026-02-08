@@ -1,4 +1,4 @@
-import { FaTimes, FaImage } from "react-icons/fa";
+import { FaTimes, FaImage, FaVideo, FaFileAudio, FaFile } from "react-icons/fa";
 import { motion } from "framer-motion";
 
 function ReplyPreview({ replyTo, onCancel, isInMessage = false }) {
@@ -7,6 +7,9 @@ function ReplyPreview({ replyTo, onCancel, isInMessage = false }) {
   const senderName =
     replyTo.sender?.username || replyTo.senderName || "Unknown";
   const isImage = replyTo.messageType === "image";
+  const isVideo = replyTo.messageType === "video";
+  const isAudio = replyTo.messageType === "audio";
+  const isFile = replyTo.messageType === "file";
 
   // Style for when it's shown inside a message bubble
   if (isInMessage) {
@@ -22,6 +25,21 @@ function ReplyPreview({ replyTo, onCancel, isInMessage = false }) {
           <div className="flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
             <FaImage className="w-3 h-3" />
             <span>Photo</span>
+          </div>
+        ) : isVideo ? (
+          <div className="flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
+            <FaVideo className="w-3 h-3" />
+            <span>Video</span>
+          </div>
+        ) : isAudio ? (
+          <div className="flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
+            <FaFileAudio className="w-3 h-3" />
+            <span>Audio</span>
+          </div>
+        ) : isFile ? (
+          <div className="flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
+            <FaFile className="w-3 h-3" />
+            <span>{replyTo.fileName || "File"}</span>
           </div>
         ) : (
           <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-1">
@@ -49,6 +67,21 @@ function ReplyPreview({ replyTo, onCancel, isInMessage = false }) {
             <FaImage className="w-4 h-4" />
             <span>Photo</span>
           </div>
+        ) : isVideo ? (
+          <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+            <FaVideo className="w-4 h-4" />
+            <span>Video</span>
+          </div>
+        ) : isAudio ? (
+          <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+            <FaFileAudio className="w-4 h-4" />
+            <span>Audio Message</span>
+          </div>
+        ) : isFile ? (
+          <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+            <FaFile className="w-4 h-4" />
+            <span className="truncate">{replyTo.fileName || "Document"}</span>
+          </div>
         ) : (
           <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2">
             {replyTo.content}
@@ -56,16 +89,22 @@ function ReplyPreview({ replyTo, onCancel, isInMessage = false }) {
         )}
       </div>
 
-      {isImage && replyTo.imageUrl && (
-        <img
-          src={
-            replyTo.imageUrl.startsWith("http")
-              ? replyTo.imageUrl
-              : `${import.meta.env.VITE_API_URL}${replyTo.imageUrl}`
-          }
-          alt="Reply preview"
-          className="w-12 h-12 rounded-lg object-cover"
-        />
+      {(isImage || isVideo) && (replyTo.imageUrl || replyTo.videoUrl) && (
+        <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
+          {isImage ? (
+            <img
+              src={
+                replyTo.imageUrl.startsWith("http")
+                  ? replyTo.imageUrl
+                  : `${import.meta.env.VITE_API_URL}${replyTo.imageUrl}`
+              }
+              alt="Reply preview"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <FaVideo className="text-neutral-500" />
+          )}
+        </div>
       )}
 
       <button

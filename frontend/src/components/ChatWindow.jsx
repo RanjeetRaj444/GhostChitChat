@@ -1,7 +1,15 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaTimes, FaImage, FaArrowDown, FaStar } from "react-icons/fa";
+import {
+  FaTimes,
+  FaImage,
+  FaArrowDown,
+  FaStar,
+  FaDownload,
+  FaVideo,
+  FaFile,
+} from "react-icons/fa";
 import MessageActions from "./MessageActions";
 import ReplyPreview from "./ReplyPreview";
 import ReactionDetails from "./ReactionDetails";
@@ -136,8 +144,49 @@ function ChatWindow({
   // Get the full image URL
   const getImageUrl = (imageUrl) => {
     if (!imageUrl) return null;
-    if (imageUrl.startsWith("http")) return imageUrl;
+    if (imageUrl.startsWith("http") || imageUrl.startsWith("blob:"))
+      return imageUrl;
     return `${import.meta.env.VITE_API_URL}${imageUrl}`;
+  };
+
+  const getVideoUrl = (videoUrl) => {
+    if (!videoUrl) return null;
+    if (videoUrl.startsWith("http") || videoUrl.startsWith("blob:"))
+      return videoUrl;
+    return `${import.meta.env.VITE_API_URL}${videoUrl}`;
+  };
+
+  const getAudioUrl = (audioUrl) => {
+    if (!audioUrl) return null;
+    if (audioUrl.startsWith("http") || audioUrl.startsWith("blob:"))
+      return audioUrl;
+    return `${import.meta.env.VITE_API_URL}${audioUrl}`;
+  };
+
+  const getFileUrl = (fileUrl) => {
+    if (!fileUrl) return null;
+    if (fileUrl.startsWith("http") || fileUrl.startsWith("blob:"))
+      return fileUrl;
+    return `${import.meta.env.VITE_API_URL}${fileUrl}`;
+  };
+
+  const handleDownload = async (url, fileName) => {
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName || "download";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("Failed to download file");
+    }
   };
 
   // Group reactions by emoji
@@ -268,6 +317,9 @@ function ChatWindow({
                     message.sender?.avatar || "/default-avatar.svg";
 
                   const isImageMessage = message.messageType === "image";
+                  const isVideoMessage = message.messageType === "video";
+                  const isAudioMessage = message.messageType === "audio";
+                  const isFileMessage = message.messageType === "file";
                   const isDeleted = message.deletedForEveryone;
                   const reactions = groupReactions(message.reactions);
 
@@ -330,10 +382,31 @@ function ChatWindow({
                                 }
                                 onDeleteForMe={onDeleteForMe}
                                 onDeleteForEveryone={onDeleteForEveryone}
-                                onDeleteStar={onToggleStar}
                                 onToggleStar={(mid) => onToggleStar?.(mid)}
                                 onEdit={onEdit}
                                 onCopy={handleCopy}
+                                onDownload={() => {
+                                  if (message.imageUrl)
+                                    handleDownload(
+                                      getImageUrl(message.imageUrl),
+                                      "image-" + message._id,
+                                    );
+                                  else if (message.videoUrl)
+                                    handleDownload(
+                                      getVideoUrl(message.videoUrl),
+                                      "video-" + message._id,
+                                    );
+                                  else if (message.audioUrl)
+                                    handleDownload(
+                                      getAudioUrl(message.audioUrl),
+                                      "audio-" + message._id,
+                                    );
+                                  else if (message.fileUrl)
+                                    handleDownload(
+                                      getFileUrl(message.fileUrl),
+                                      message.fileName,
+                                    );
+                                }}
                                 canEdit={canEditMessage(message)}
                                 canDeleteForEveryone={canDeleteForEveryoneMessage(
                                   message,
@@ -384,52 +457,243 @@ function ChatWindow({
                                     getImageUrl(message.imageUrl),
                                   )
                                 }
+                                onDoubleClick={() =>
+                                  onReact?.(message._id, "❤️")
+                                }
                               >
-                                <img
-                                  src={getImageUrl(message.imageUrl)}
-                                  alt="Shared image"
-                                  className="max-w-full max-h-64 object-cover rounded-2xl hover:opacity-90 transition-opacity"
-                                  loading="lazy"
-                                />
-                                {message.isSending && (
-                                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-2xl">
-                                    <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                                  </div>
-                                )}
-
-                                {/* Image Metadata Overlay */}
-                                <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-lg border border-white/10">
-                                  {message.starredBy?.some(
-                                    (id) =>
-                                      (id._id || id).toString() ===
-                                      currentUser?._id.toString(),
-                                  ) && (
-                                    <FaStar className="w-2.5 h-2.5 text-yellow-400" />
-                                  )}
-                                  <span className="text-[10px] font-bold text-white/90 leading-none">
-                                    {formatMessageTime(message.createdAt)}
-                                  </span>
-                                  {isSentByCurrentUser && (
-                                    <div className="flex items-center h-3">
-                                      {message.isSending ? (
-                                        <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                      ) : (
-                                        <div className="flex -space-x-1">
-                                          <span
-                                            className={`text-[10px] font-black ${message.isRead ? "text-primary-400" : "text-white/60"}`}
-                                          >
-                                            ✓
-                                          </span>
-                                          {message.isRead && (
-                                            <span className="text-[10px] font-black text-primary-400">
-                                              ✓
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
+                                <div className="group/media relative">
+                                  <img
+                                    src={getImageUrl(message.imageUrl)}
+                                    alt="Shared"
+                                    className="max-w-full max-h-[500px] object-cover rounded-2xl hover:scale-[1.01] transition-transform duration-500"
+                                    loading="lazy"
+                                  />
+                                  {message.isSending && (
+                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-2xl">
+                                      <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mb-2" />
+                                      <span className="text-[10px] text-white font-medium">
+                                        Sharing...
+                                      </span>
                                     </div>
                                   )}
+
+                                  {/* Image Metadata Overlay - Insta Style */}
+                                  <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 group-hover:bg-black/60 transition-colors">
+                                    {message.starredBy?.some(
+                                      (id) =>
+                                        (id._id || id).toString() ===
+                                        currentUser?._id.toString(),
+                                    ) && (
+                                      <FaStar className="w-2.5 h-2.5 text-yellow-400" />
+                                    )}
+                                    <span className="text-[10px] font-bold text-white/90 leading-none">
+                                      {formatMessageTime(message.createdAt)}
+                                    </span>
+                                    {isSentByCurrentUser && (
+                                      <div className="flex items-center h-3">
+                                        {message.isSending ? (
+                                          <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                          <div className="flex -space-x-1">
+                                            <span
+                                              className={`text-[10px] font-black ${message.isRead ? "text-primary-400" : "text-white/60"}`}
+                                            >
+                                              ✓
+                                            </span>
+                                            {message.isRead && (
+                                              <span className="text-[10px] font-black text-primary-400">
+                                                ✓
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDownload(
+                                        getImageUrl(message.imageUrl),
+                                        "image-" + message._id,
+                                      );
+                                    }}
+                                    className="absolute top-2 left-2 p-2 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 text-white/90 opacity-0 group-hover/media:opacity-100 transition-all hover:bg-black/60 hover:scale-110"
+                                    title="Download"
+                                  >
+                                    <FaDownload className="w-4 h-4" />
+                                  </button>
                                 </div>
+                                <button
+                                  onClick={() =>
+                                    handleDownload(
+                                      getImageUrl(message.imageUrl),
+                                      "image-" + message._id,
+                                    )
+                                  }
+                                  className="absolute top-1.5 left-1.5 p-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-white/90 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Download"
+                                >
+                                  <FaDownload className="w-3.5 h-3.5" />
+                                </button>
+                              </motion.div>
+                            ) : isVideoMessage ? (
+                              <motion.div
+                                layout
+                                className={`relative overflow-hidden rounded-2xl ${
+                                  isSentByCurrentUser
+                                    ? "rounded-br-none"
+                                    : "rounded-bl-none"
+                                } ${message.replyTo ? "rounded-t-none" : ""}`}
+                              >
+                                <div
+                                  onDoubleClick={() =>
+                                    onReact?.(message._id, "❤️")
+                                  }
+                                  className="relative group/media overflow-hidden rounded-2xl bg-black"
+                                >
+                                  <video
+                                    key={message.videoUrl}
+                                    src={getVideoUrl(message.videoUrl)}
+                                    controls
+                                    preload="metadata"
+                                    playsInline
+                                    className="max-w-full max-h-[500px] rounded-2xl"
+                                  />
+                                  {message.isSending && (
+                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-2xl">
+                                      <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mb-2" />
+                                      <span className="text-[10px] text-white font-medium">
+                                        Compressing...
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Video Metadata Overlay */}
+                                  <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
+                                    {message.starredBy?.some(
+                                      (id) =>
+                                        (id._id || id).toString() ===
+                                        currentUser?._id.toString(),
+                                    ) && (
+                                      <FaStar className="w-2.5 h-2.5 text-yellow-400" />
+                                    )}
+                                    <span className="text-[10px] font-bold text-white/90 leading-none">
+                                      {formatMessageTime(message.createdAt)}
+                                    </span>
+                                    {isSentByCurrentUser && (
+                                      <div className="flex items-center h-3">
+                                        {message.isSending ? (
+                                          <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                          <div className="flex -space-x-1">
+                                            <span
+                                              className={`text-[10px] font-black ${message.isRead ? "text-primary-400" : "text-white/60"}`}
+                                            >
+                                              ✓
+                                            </span>
+                                            {message.isRead && (
+                                              <span className="text-[10px] font-black text-primary-400">
+                                                ✓
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      handleDownload(
+                                        getVideoUrl(message.videoUrl),
+                                        "video-" + message._id,
+                                      )
+                                    }
+                                    className="absolute top-2 left-2 p-2 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 text-white/90 opacity-0 group-hover/media:opacity-100 transition-all hover:bg-black/60"
+                                    title="Download"
+                                  >
+                                    <FaDownload className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </motion.div>
+                            ) : isAudioMessage ? (
+                              <motion.div
+                                layout
+                                className={`relative p-3 rounded-2xl ${
+                                  isSentByCurrentUser
+                                    ? "bg-primary-600 text-white rounded-br-none"
+                                    : "bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 rounded-bl-none"
+                                }`}
+                              >
+                                <div className="flex flex-col gap-2 min-w-[200px]">
+                                  <audio
+                                    src={getAudioUrl(message.audioUrl)}
+                                    controls
+                                    className="w-full h-10"
+                                  />
+                                  <div className="flex justify-between items-center text-[10px] opacity-70">
+                                    <span>Audio Message</span>
+                                    <div className="flex items-center gap-1">
+                                      {formatMessageTime(message.createdAt)}
+                                      {isSentByCurrentUser && (
+                                        <span>
+                                          {message.isRead ? "✓✓" : "✓"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() =>
+                                    handleDownload(
+                                      getAudioUrl(message.audioUrl),
+                                      "audio-" + message._id,
+                                    )
+                                  }
+                                  className="absolute -top-2 -left-2 p-1.5 bg-neutral-800/80 backdrop-blur-md rounded-lg border border-white/10 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <FaDownload className="w-3 h-3" />
+                                </button>
+                              </motion.div>
+                            ) : isFileMessage ? (
+                              <motion.div
+                                layout
+                                className={`relative p-3 rounded-2xl flex items-center gap-3 ${
+                                  isSentByCurrentUser
+                                    ? "bg-primary-600 text-white rounded-br-none"
+                                    : "bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 rounded-bl-none"
+                                }`}
+                              >
+                                <div className="w-10 h-10 rounded-xl bg-black/10 flex items-center justify-center">
+                                  <FaFile className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">
+                                    {message.fileName || "Document"}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <button
+                                      onClick={() =>
+                                        handleDownload(
+                                          getFileUrl(message.fileUrl),
+                                          message.fileName,
+                                        )
+                                      }
+                                      className="text-[10px] font-bold underline hover:opacity-80"
+                                    >
+                                      Download
+                                    </button>
+                                    <span className="text-[10px] opacity-70">
+                                      {formatMessageTime(message.createdAt)}
+                                    </span>
+                                  </div>
+                                </div>
+                                {isSentByCurrentUser && (
+                                  <span className="text-[10px] self-end opacity-70 ml-2">
+                                    {message.isRead ? "✓✓" : "✓"}
+                                  </span>
+                                )}
                               </motion.div>
                             ) : (
                               <motion.div
@@ -503,6 +767,28 @@ function ChatWindow({
                                 onToggleStar={(mid) => onToggleStar?.(mid)}
                                 onEdit={onEdit}
                                 onCopy={handleCopy}
+                                onDownload={() => {
+                                  if (message.imageUrl)
+                                    handleDownload(
+                                      getImageUrl(message.imageUrl),
+                                      "image-" + message._id,
+                                    );
+                                  else if (message.videoUrl)
+                                    handleDownload(
+                                      getVideoUrl(message.videoUrl),
+                                      "video-" + message._id,
+                                    );
+                                  else if (message.audioUrl)
+                                    handleDownload(
+                                      getAudioUrl(message.audioUrl),
+                                      "audio-" + message._id,
+                                    );
+                                  else if (message.fileUrl)
+                                    handleDownload(
+                                      getFileUrl(message.fileUrl),
+                                      message.fileName,
+                                    );
+                                }}
                                 canEdit={canEditMessage(message)}
                                 canDeleteForEveryone={canDeleteForEveryoneMessage(
                                   message,

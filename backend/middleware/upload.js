@@ -23,9 +23,10 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter for images only
+// File filter for images, videos, audio, and documents
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp/;
+  const allowedTypes =
+    /jpeg|jpg|png|gif|webp|mp4|webm|mpeg|pdf|doc|docx|txt|mp3|wav|m4a/;
   const extname = allowedTypes.test(
     path.extname(file.originalname).toLowerCase(),
   );
@@ -34,7 +35,12 @@ const fileFilter = (req, file, cb) => {
   if (extname && mimetype) {
     cb(null, true);
   } else {
-    cb(new Error("Only image files are allowed!"), false);
+    cb(
+      new Error(
+        "Only image, video, audio, and document files (pdf, doc, txt) are allowed!",
+      ),
+      false,
+    );
   }
 };
 

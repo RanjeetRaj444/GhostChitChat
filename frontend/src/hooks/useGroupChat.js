@@ -119,10 +119,21 @@ export const useGroupChat = () => {
         const updated = [...prev];
         const isSelected = selectedGroupRef.current?._id === groupId;
 
+        const messageContent =
+          data.messageType === "image"
+            ? "📷 Image"
+            : data.messageType === "video"
+              ? "🎥 Video"
+              : data.messageType === "audio"
+                ? "🎵 Audio"
+                : data.messageType === "file"
+                  ? "📄 Document"
+                  : message;
+
         updated[idx] = {
           ...updated[idx],
           lastMessage: {
-            content: message,
+            content: messageContent,
             createdAt: timestamp,
             sender: { _id: senderId, ...senderProfile },
           },
@@ -146,6 +157,10 @@ export const useGroupChat = () => {
               content: message,
               messageType: data.messageType || "text",
               imageUrl: data.imageUrl || null,
+              videoUrl: data.videoUrl || null,
+              audioUrl: data.audioUrl || null,
+              fileUrl: data.fileUrl || null,
+              fileName: data.fileName || null,
               replyTo: data.replyTo || null,
               reactions: [],
               sender: {
@@ -362,6 +377,224 @@ export const useGroupChat = () => {
         ),
       );
       toast.error("Failed to send image");
+    }
+  };
+
+  // Send video to group
+  const sendGroupVideo = async (videoFile, replyToId = null) => {
+    if (!selectedGroup || !videoFile || !api) return;
+
+    // Check file size (5MB limit)
+    if (videoFile.size > 5 * 1024 * 1024) {
+      toast.error("Video size must be less than 5MB");
+      return;
+    }
+
+    const tempId = Date.now().toString();
+    const localVideoUrl = URL.createObjectURL(videoFile);
+
+    const newMessage = {
+      _id: tempId,
+      content: "",
+      messageType: "video",
+      videoUrl: localVideoUrl,
+      replyTo: replyTo || null,
+      reactions: [],
+      sender: {
+        _id: currentUser._id,
+        username: currentUser.username,
+        avatar: currentUser.avatar || "/default-avatar.svg",
+      },
+      group: selectedGroup._id,
+      createdAt: new Date().toISOString(),
+      isSending: true,
+      failed: false,
+    };
+
+    setGroupMessages((prev) => [...prev, newMessage]);
+    updateGroupList(selectedGroup._id, "🎥 Video");
+    setReplyTo(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("video", videoFile);
+      formData.append("groupId", selectedGroup._id);
+      if (replyToId || replyTo?._id) {
+        formData.append("replyToId", replyToId || replyTo._id);
+      }
+
+      const res = await api.post("/group-messages/video", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      URL.revokeObjectURL(localVideoUrl);
+
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId
+            ? { ...res.data, isSending: false, failed: false }
+            : msg,
+        ),
+      );
+
+      sendSocketGroupMessage(selectedGroup._id, "🎥 Video", res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "video",
+        videoUrl: res.data.videoUrl,
+      });
+    } catch (err) {
+      console.error("Send group video error:", err);
+      URL.revokeObjectURL(localVideoUrl);
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg,
+        ),
+      );
+      toast.error(err.response?.data?.message || "Failed to send video");
+    }
+  };
+
+  // Send audio to group
+  const sendGroupAudio = async (audioFile, replyToId = null) => {
+    if (!selectedGroup || !audioFile || !api) return;
+
+    if (audioFile.size > 5 * 1024 * 1024) {
+      toast.error("Audio size must be less than 5MB");
+      return;
+    }
+
+    const tempId = Date.now().toString();
+    const localAudioUrl = URL.createObjectURL(audioFile);
+
+    const newMessage = {
+      _id: tempId,
+      content: "",
+      messageType: "audio",
+      audioUrl: localAudioUrl,
+      replyTo: replyTo || null,
+      reactions: [],
+      sender: {
+        _id: currentUser._id,
+        username: currentUser.username,
+        avatar: currentUser.avatar || "/default-avatar.svg",
+      },
+      group: selectedGroup._id,
+      createdAt: new Date().toISOString(),
+      isSending: true,
+      failed: false,
+    };
+
+    setGroupMessages((prev) => [...prev, newMessage]);
+    updateGroupList(selectedGroup._id, "🎵 Audio");
+    setReplyTo(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioFile);
+      formData.append("groupId", selectedGroup._id);
+      if (replyToId || replyTo?._id) {
+        formData.append("replyToId", replyToId || replyTo._id);
+      }
+
+      const res = await api.post("/group-messages/audio", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      URL.revokeObjectURL(localAudioUrl);
+
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId
+            ? { ...res.data, isSending: false, failed: false }
+            : msg,
+        ),
+      );
+
+      sendSocketGroupMessage(selectedGroup._id, "🎵 Audio", res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "audio",
+        audioUrl: res.data.audioUrl,
+      });
+    } catch (err) {
+      console.error("Send group audio error:", err);
+      URL.revokeObjectURL(localAudioUrl);
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg,
+        ),
+      );
+      toast.error(err.response?.data?.message || "Failed to send audio");
+    }
+  };
+
+  // Send file to group
+  const sendGroupFile = async (file, replyToId = null) => {
+    if (!selectedGroup || !file || !api) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+
+    const tempId = Date.now().toString();
+
+    const newMessage = {
+      _id: tempId,
+      content: "",
+      messageType: "file",
+      fileName: file.name,
+      fileUrl: null,
+      replyTo: replyTo || null,
+      reactions: [],
+      sender: {
+        _id: currentUser._id,
+        username: currentUser.username,
+        avatar: currentUser.avatar || "/default-avatar.svg",
+      },
+      group: selectedGroup._id,
+      createdAt: new Date().toISOString(),
+      isSending: true,
+      failed: false,
+    };
+
+    setGroupMessages((prev) => [...prev, newMessage]);
+    updateGroupList(selectedGroup._id, "📄 Document");
+    setReplyTo(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("groupId", selectedGroup._id);
+      if (replyToId || replyTo?._id) {
+        formData.append("replyToId", replyToId || replyTo._id);
+      }
+
+      const res = await api.post("/group-messages/file", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId
+            ? { ...res.data, isSending: false, failed: false }
+            : msg,
+        ),
+      );
+
+      sendSocketGroupMessage(selectedGroup._id, "📄 Document", res.data._id, {
+        replyTo: res.data.replyTo,
+        messageType: "file",
+        fileUrl: res.data.fileUrl,
+        fileName: res.data.fileName,
+      });
+    } catch (err) {
+      console.error("Send group file error:", err);
+      setGroupMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempId ? { ...msg, isSending: false, failed: true } : msg,
+        ),
+      );
+      toast.error(err.response?.data?.message || "Failed to send file");
     }
   };
 
@@ -776,5 +1009,8 @@ export const useGroupChat = () => {
     muteGroup,
     toggleGroupFavorite,
     toggleGroupStar,
+    sendGroupVideo,
+    sendGroupAudio,
+    sendGroupFile,
   };
 };

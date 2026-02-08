@@ -43,7 +43,7 @@ router.post("/", auth, async (req, res) => {
     if (replyToId) {
       await message.populate({
         path: "replyTo",
-        select: "content sender messageType imageUrl",
+        select: "content sender messageType imageUrl videoUrl",
         populate: { path: "sender", select: "username avatar" },
       });
     }
@@ -99,7 +99,8 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
     if (replyToId) {
       await message.populate({
         path: "replyTo",
-        select: "content sender messageType imageUrl",
+        select:
+          "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
         populate: { path: "sender", select: "username avatar" },
       });
     }
@@ -111,6 +112,169 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
     res.status(201).json(message);
   } catch (error) {
     console.error("Send group image message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Send video message to group
+router.post("/video", auth, upload.single("video"), async (req, res) => {
+  try {
+    const { groupId, replyToId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No video provided" });
+    }
+
+    // Verify user is a member of the group
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const isMember = group.members.some(
+      (m) => m.toString() === req.user._id.toString(),
+    );
+
+    if (!isMember) {
+      return res.status(403).json({ message: "Not a member of this group" });
+    }
+
+    const videoUrl = `/uploads/${req.file.filename}`;
+
+    const message = new GroupMessage({
+      group: groupId,
+      sender: req.user._id,
+      content: "",
+      messageType: "video",
+      videoUrl: videoUrl,
+      replyTo: replyToId || null,
+      readBy: [{ user: req.user._id, readAt: new Date() }],
+    });
+
+    await message.save();
+    await message.populate("sender", "username avatar");
+    if (replyToId) {
+      await message.populate({
+        path: "replyTo",
+        select:
+          "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
+        populate: { path: "sender", select: "username avatar" },
+      });
+    }
+
+    // Update group's last activity
+    group.lastActivity = new Date();
+    await group.save();
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Send group video message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Send audio message to group
+router.post("/audio", auth, upload.single("audio"), async (req, res) => {
+  try {
+    const { groupId, replyToId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No audio provided" });
+    }
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ message: "Group not found" });
+
+    const isMember = group.members.some(
+      (m) => m.toString() === req.user._id.toString(),
+    );
+    if (!isMember) {
+      return res.status(403).json({ message: "Not a member of this group" });
+    }
+
+    const audioUrl = `/uploads/${req.file.filename}`;
+
+    const message = new GroupMessage({
+      group: groupId,
+      sender: req.user._id,
+      content: "",
+      messageType: "audio",
+      audioUrl: audioUrl,
+      replyTo: replyToId || null,
+      readBy: [{ user: req.user._id, readAt: new Date() }],
+    });
+
+    await message.save();
+    await message.populate("sender", "username avatar");
+    if (replyToId) {
+      await message.populate({
+        path: "replyTo",
+        select:
+          "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
+        populate: { path: "sender", select: "username avatar" },
+      });
+    }
+
+    group.lastActivity = new Date();
+    await group.save();
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Send group audio message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Send file message to group
+router.post("/file", auth, upload.single("file"), async (req, res) => {
+  try {
+    const { groupId, replyToId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file provided" });
+    }
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ message: "Group not found" });
+
+    const isMember = group.members.some(
+      (m) => m.toString() === req.user._id.toString(),
+    );
+    if (!isMember) {
+      return res.status(403).json({ message: "Not a member of this group" });
+    }
+
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileName = req.file.originalname;
+
+    const message = new GroupMessage({
+      group: groupId,
+      sender: req.user._id,
+      content: "",
+      messageType: "file",
+      fileUrl: fileUrl,
+      fileName: fileName,
+      replyTo: replyToId || null,
+      readBy: [{ user: req.user._id, readAt: new Date() }],
+    });
+
+    await message.save();
+    await message.populate("sender", "username avatar");
+    if (replyToId) {
+      await message.populate({
+        path: "replyTo",
+        select:
+          "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
+        populate: { path: "sender", select: "username avatar" },
+      });
+    }
+
+    group.lastActivity = new Date();
+    await group.save();
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Send group file message error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

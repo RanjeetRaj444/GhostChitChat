@@ -19,10 +19,26 @@ const messageSchema = new mongoose.Schema(
     },
     messageType: {
       type: String,
-      enum: ["text", "image"],
+      enum: ["text", "image", "video", "audio", "file"],
       default: "text",
     },
     imageUrl: {
+      type: String,
+      default: null,
+    },
+    videoUrl: {
+      type: String,
+      default: null,
+    },
+    audioUrl: {
+      type: String,
+      default: null,
+    },
+    fileUrl: {
+      type: String,
+      default: null,
+    },
+    fileName: {
       type: String,
       default: null,
     },
@@ -117,11 +133,9 @@ messageSchema.statics.getConversation = async function (
     .populate("receiver", "username avatar")
     .populate({
       path: "replyTo",
-      select: "content sender messageType imageUrl",
-      populate: {
-        path: "sender",
-        select: "username avatar",
-      },
+      select:
+        "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
+      populate: { path: "sender", select: "username avatar" },
     })
     .populate("reactions.user", "username avatar");
 };
@@ -290,7 +304,8 @@ messageSchema.statics.searchMessages = async function (
     .populate("receiver", "username avatar")
     .populate({
       path: "replyTo",
-      select: "content sender messageType imageUrl",
+      select:
+        "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
       populate: { path: "sender", select: "username avatar" },
     });
 };
@@ -305,7 +320,7 @@ messageSchema.statics.getStarredMessages = async function (userId) {
     .populate("receiver", "username avatar")
     .populate({
       path: "replyTo",
-      select: "content sender messageType imageUrl",
+      select: "content sender messageType imageUrl videoUrl",
       populate: { path: "sender", select: "username avatar" },
     });
 };

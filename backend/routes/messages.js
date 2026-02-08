@@ -99,7 +99,8 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
     if (replyToId) {
       await message.populate({
         path: "replyTo",
-        select: "content sender messageType imageUrl",
+        select:
+          "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
         populate: { path: "sender", select: "username avatar" },
       });
     }
@@ -107,6 +108,169 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
     res.status(201).json(message);
   } catch (error) {
     console.error("Send image message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Send video message
+router.post("/video", auth, upload.single("video"), async (req, res) => {
+  try {
+    const { receiverId, replyToId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No video provided" });
+    }
+
+    const videoUrl = `/uploads/${req.file.filename}`;
+
+    // Check for blocks
+    const receiver = await mongoose.model("ChatUser").findById(receiverId);
+    if (!receiver) return res.status(404).json({ message: "User not found" });
+
+    if (receiver.blockedUsers.includes(req.user._id)) {
+      return res.status(403).json({ message: "You are blocked by this user" });
+    }
+    if (req.user.blockedUsers.includes(receiverId)) {
+      return res.status(403).json({ message: "You have blocked this user" });
+    }
+
+    const message = new Message({
+      sender: req.user._id,
+      receiver: receiverId,
+      content: "",
+      messageType: "video",
+      videoUrl: videoUrl,
+      replyTo: replyToId || null,
+    });
+
+    await message.save();
+
+    // Automatically add to contacts
+    await mongoose.model("ChatUser").findByIdAndUpdate(req.user._id, {
+      $addToSet: { contacts: receiverId },
+    });
+    await message.populate("sender", "username avatar");
+    await message.populate("receiver", "username avatar");
+    if (replyToId) {
+      await message.populate({
+        path: "replyTo",
+        select:
+          "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
+        populate: { path: "sender", select: "username avatar" },
+      });
+    }
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Send video message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Send audio message
+router.post("/audio", auth, upload.single("audio"), async (req, res) => {
+  try {
+    const { receiverId, replyToId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No audio provided" });
+    }
+
+    const audioUrl = `/uploads/${req.file.filename}`;
+
+    const receiver = await mongoose.model("ChatUser").findById(receiverId);
+    if (!receiver) return res.status(404).json({ message: "User not found" });
+
+    if (receiver.blockedUsers.includes(req.user._id)) {
+      return res.status(403).json({ message: "You are blocked by this user" });
+    }
+    if (req.user.blockedUsers.includes(receiverId)) {
+      return res.status(403).json({ message: "You have blocked this user" });
+    }
+
+    const message = new Message({
+      sender: req.user._id,
+      receiver: receiverId,
+      content: "",
+      messageType: "audio",
+      audioUrl: audioUrl,
+      replyTo: replyToId || null,
+    });
+
+    await message.save();
+
+    await mongoose.model("ChatUser").findByIdAndUpdate(req.user._id, {
+      $addToSet: { contacts: receiverId },
+    });
+    await message.populate("sender", "username avatar");
+    await message.populate("receiver", "username avatar");
+    if (replyToId) {
+      await message.populate({
+        path: "replyTo",
+        select:
+          "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
+        populate: { path: "sender", select: "username avatar" },
+      });
+    }
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Send audio message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Send file message
+router.post("/file", auth, upload.single("file"), async (req, res) => {
+  try {
+    const { receiverId, replyToId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file provided" });
+    }
+
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileName = req.file.originalname;
+
+    const receiver = await mongoose.model("ChatUser").findById(receiverId);
+    if (!receiver) return res.status(404).json({ message: "User not found" });
+
+    if (receiver.blockedUsers.includes(req.user._id)) {
+      return res.status(403).json({ message: "You are blocked by this user" });
+    }
+    if (req.user.blockedUsers.includes(receiverId)) {
+      return res.status(403).json({ message: "You have blocked this user" });
+    }
+
+    const message = new Message({
+      sender: req.user._id,
+      receiver: receiverId,
+      content: "",
+      messageType: "file",
+      fileUrl: fileUrl,
+      fileName: fileName,
+      replyTo: replyToId || null,
+    });
+
+    await message.save();
+
+    await mongoose.model("ChatUser").findByIdAndUpdate(req.user._id, {
+      $addToSet: { contacts: receiverId },
+    });
+    await message.populate("sender", "username avatar");
+    await message.populate("receiver", "username avatar");
+    if (replyToId) {
+      await message.populate({
+        path: "replyTo",
+        select:
+          "content sender messageType imageUrl videoUrl audioUrl fileUrl fileName",
+        populate: { path: "sender", select: "username avatar" },
+      });
+    }
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Send file message error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
