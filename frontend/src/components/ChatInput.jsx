@@ -340,8 +340,8 @@ function ChatInput({
       </AnimatePresence>
 
       {showEmojiPicker && (
-        <div className="absolute bottom-full left-4 z-10 shadow-xl rounded-xl mb-2">
-          <EmojiPicker onEmojiClick={onEmojiClick} theme="auto" />
+        <div className="absolute bottom-full left-0 sm:left-4 z-10 shadow-xl rounded-xl mb-2 w-full sm:w-auto max-w-[100vw] sm:max-w-none flex justify-center sm:justify-start overflow-hidden">
+          <EmojiPicker onEmojiClick={onEmojiClick} theme="auto" width="100%" />
         </div>
       )}
 

@@ -200,7 +200,7 @@ function ContactInfoPanel({
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed md:relative inset-0 md:inset-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 md:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 md:z-auto"
+        className="fixed xl:relative inset-0 xl:inset-auto md:inset-y-0 md:right-0 md:left-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 xl:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 xl:z-auto shadow-2xl xl:shadow-none"
       >
         <div className="flex items-center px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
           <button
@@ -327,7 +327,7 @@ function ContactInfoPanel({
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed md:relative inset-0 md:inset-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 md:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 md:z-auto"
+        className="fixed xl:relative inset-0 xl:inset-auto md:inset-y-0 md:right-0 md:left-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 xl:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 xl:z-auto shadow-2xl xl:shadow-none"
       >
         <div className="flex items-center px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
           <button
@@ -367,7 +367,7 @@ function ContactInfoPanel({
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed md:relative inset-0 md:inset-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 md:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 md:z-auto"
+        className="fixed xl:relative inset-0 xl:inset-auto md:inset-y-0 md:right-0 md:left-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 xl:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 xl:z-auto shadow-2xl xl:shadow-none"
       >
         <div className="flex flex-col bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
           <div className="flex items-center px-4 py-3">
@@ -530,7 +530,7 @@ function ContactInfoPanel({
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed md:relative inset-0 md:inset-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 md:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 md:z-auto"
+      className="fixed xl:relative inset-0 xl:inset-auto md:inset-y-0 md:right-0 md:left-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 xl:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 xl:z-auto shadow-2xl xl:shadow-none"
     >
       {/* Header */}
       <div className="flex items-center px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
