@@ -384,9 +384,9 @@ export const useGroupChat = () => {
   const sendGroupVideo = async (videoFile, replyToId = null) => {
     if (!selectedGroup || !videoFile || !api) return;
 
-    // Check file size (5MB limit)
-    if (videoFile.size > 5 * 1024 * 1024) {
-      toast.error("Video size must be less than 5MB");
+    // Check file size (50MB limit)
+    if (videoFile.size > 50 * 1024 * 1024) {
+      toast.error("Video size must be less than 50MB");
       return;
     }
 
@@ -458,8 +458,8 @@ export const useGroupChat = () => {
   const sendGroupAudio = async (audioFile, replyToId = null) => {
     if (!selectedGroup || !audioFile || !api) return;
 
-    if (audioFile.size > 5 * 1024 * 1024) {
-      toast.error("Audio size must be less than 5MB");
+    if (audioFile.size > 25 * 1024 * 1024) {
+      toast.error("Audio size must be less than 25MB");
       return;
     }
 
@@ -531,8 +531,8 @@ export const useGroupChat = () => {
   const sendGroupFile = async (file, replyToId = null) => {
     if (!selectedGroup || !file || !api) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5MB");
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("File size must be less than 25MB");
       return;
     }
 

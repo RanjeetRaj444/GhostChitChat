@@ -483,6 +483,10 @@ router.delete("/:messageId/delete-for-everyone", auth, async (req, res) => {
     message.deletedAt = new Date();
     message.content = "";
     message.imageUrl = null;
+    message.videoUrl = null;
+    message.audioUrl = null;
+    message.fileUrl = null;
+    message.fileName = null;
 
     await message.save();
 

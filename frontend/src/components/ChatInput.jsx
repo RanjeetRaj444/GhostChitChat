@@ -112,9 +112,9 @@ function ChatInput({
   const handleImageSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Image size must be less than 5MB");
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        alert("Image size must be less than 10MB");
         return;
       }
 
@@ -137,8 +137,8 @@ function ChatInput({
   const handleVideoSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Video size must be less than 5MB");
+      if (file.size > 50 * 1024 * 1024) {
+        alert("Video size must be less than 50MB");
         return;
       }
       if (!file.type.startsWith("video/")) {
@@ -156,8 +156,8 @@ function ChatInput({
   const handleAudioSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Audio size must be less than 5MB");
+      if (file.size > 25 * 1024 * 1024) {
+        alert("Audio size must be less than 25MB");
         return;
       }
       if (!file.type.startsWith("audio/")) {
@@ -175,8 +175,8 @@ function ChatInput({
   const handleDocSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File size must be less than 5MB");
+      if (file.size > 25 * 1024 * 1024) {
+        alert("File size must be less than 25MB");
         return;
       }
       clearSelectedFiles();
