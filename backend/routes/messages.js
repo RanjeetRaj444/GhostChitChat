@@ -600,11 +600,67 @@ router.post("/:messageId/star", auth, async (req, res) => {
     await message.save();
     res.json({
       success: true,
-      isStarred: !isStarred,
+      isStarred: message.starredBy.includes(currentUserId),
       starredBy: message.starredBy,
     });
   } catch (error) {
     console.error("Star message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Toggle pin status of a message
+router.post("/:messageId/pin", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    message.isPinned = !message.isPinned;
+    message.pinnedAt = message.isPinned ? new Date() : null;
+
+    await message.save();
+    res.json(message);
+  } catch (error) {
+    console.error("Pin message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Forward a message to another user
+router.post("/:messageId/forward", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { targetUserId } = req.body;
+
+    const originalMessage = await Message.findById(messageId);
+    if (!originalMessage) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    const forwardedMessage = new Message({
+      sender: req.user._id,
+      receiver: targetUserId,
+      content: originalMessage.content,
+      messageType: originalMessage.messageType,
+      imageUrl: originalMessage.imageUrl,
+      videoUrl: originalMessage.videoUrl,
+      audioUrl: originalMessage.audioUrl,
+      fileUrl: originalMessage.fileUrl,
+      fileName: originalMessage.fileName,
+      isForwarded: true,
+    });
+
+    await forwardedMessage.save();
+    await forwardedMessage.populate("sender", "username avatar");
+    await forwardedMessage.populate("receiver", "username avatar");
+
+    res.status(201).json(forwardedMessage);
+  } catch (error) {
+    console.error("Forward message error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

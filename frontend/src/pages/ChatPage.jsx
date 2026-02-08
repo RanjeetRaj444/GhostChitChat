@@ -15,6 +15,8 @@ import GroupInfoModal from "../components/GroupInfoModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import ClearChatModal from "../components/ClearChatModal";
 import ContactInfoPanel from "../components/ContactInfoPanel";
+import ForwardModal from "../components/ForwardModal";
+import MessageInfoModal from "../components/MessageInfoModal";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 
@@ -31,6 +33,12 @@ function ChatPage() {
   const [isDeletingContact, setIsDeletingContact] = useState(false);
   const [clearingTarget, setClearingTarget] = useState(null); // { id: string, type: 'private' | 'group' }
   const [isClearingChat, setIsClearingChat] = useState(false);
+  const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [messageInfoTarget, setMessageInfoTarget] = useState(null);
+  const [showMessageInfoModal, setShowMessageInfoModal] = useState(false);
+  const [selectedMessages, setSelectedMessages] = useState([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   const {
     isUserOnline,
@@ -220,6 +228,83 @@ function ChatPage() {
     } else if (selectedGroup) {
       await editGroupMessage(messageId, content);
     }
+  };
+
+  const handlePin = async (messageId) => {
+    if (selectedUser) {
+      await togglePin(messageId);
+    } else if (selectedGroup) {
+      await toggleGroupPin(messageId);
+    }
+  };
+
+  const handleForward = (message) => {
+    setForwardingMessage(message);
+    setShowForwardModal(true);
+  };
+
+  const handleSelectForwardTarget = async (target) => {
+    if (!forwardingMessage) return;
+
+    try {
+      const messageIds = Array.isArray(forwardingMessage._id)
+        ? forwardingMessage._id
+        : [forwardingMessage._id];
+
+      for (const mid of messageIds) {
+        if (target.type === "private") {
+          if (selectedGroup) {
+            await forwardGroupMessage(mid, { targetUserId: target.id });
+          } else {
+            await forwardMessage(mid, target.id);
+          }
+        } else {
+          if (selectedUser) {
+            await api.post(`/group-messages/${mid}/forward`, {
+              targetGroupId: target.id,
+            });
+          } else {
+            await forwardGroupMessage(mid, { targetGroupId: target.id });
+          }
+        }
+      }
+
+      if (Array.isArray(forwardingMessage._id)) {
+        toast.success(`${messageIds.length} messages forwarded`);
+        clearSelection();
+      } else {
+        toast.success("Message forwarded");
+      }
+
+      setShowForwardModal(false);
+      setForwardingMessage(null);
+    } catch (err) {
+      console.error("Forward error:", err);
+      toast.error("Failed to forward message");
+    }
+  };
+
+  const handleMessageInfo = (message) => {
+    setMessageInfoTarget(message);
+    setShowMessageInfoModal(true);
+  };
+
+  const handleSelect = (messageId) => {
+    setIsSelectionMode(true);
+    setSelectedMessages([messageId]);
+  };
+
+  const handleToggleMessageSelection = (messageId) => {
+    setSelectedMessages((prev) =>
+      prev.includes(messageId)
+        ? prev.filter((id) => id !== messageId)
+        : [...prev, messageId],
+    );
+  };
+
+  const clearSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedMessages([]);
   };
 
   const handleLogout = () => {
@@ -412,9 +497,95 @@ function ChatPage() {
                     onDeleteForEveryone={handleDeleteForEveryone}
                     onEdit={handleEdit}
                     onToggleStar={selectedGroup ? toggleGroupStar : toggleStar}
+                    onTogglePin={handlePin}
+                    onForward={handleForward}
+                    onInfo={handleMessageInfo}
+                    onSelect={handleSelect}
+                    isSelectionMode={isSelectionMode}
+                    selectedMessages={selectedMessages}
+                    onToggleSelection={handleToggleMessageSelection}
                     searchQuery={chatSearchQuery}
                     scrollTrigger={scrollTrigger}
                   />
+
+                  {/* Selection Action Bar */}
+                  <AnimatePresence>
+                    {isSelectionMode && (
+                      <motion.div
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-lg"
+                      >
+                        <div className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-3xl p-4 shadow-2xl flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={clearSelection}
+                              className="p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-xl transition-colors text-neutral-500"
+                            >
+                              <FaTimes />
+                            </button>
+                            <div>
+                              <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                                {selectedMessages.length} selected
+                              </p>
+                              <p className="text-[10px] text-neutral-500 font-medium uppercase tracking-wider">
+                                Choose an action
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                // Forward multiple
+                                if (selectedMessages.length > 0) {
+                                  // For now, let's just use the first one as a reference or adapt the modal
+                                  const firstMsgId = selectedMessages[0];
+                                  const msg =
+                                    messages.find(
+                                      (m) => m._id === firstMsgId,
+                                    ) ||
+                                    groupMessages.find(
+                                      (m) => m._id === firstMsgId,
+                                    );
+                                  if (msg) {
+                                    setForwardingMessage({
+                                      ...msg,
+                                      _id: selectedMessages,
+                                    }); // Special case for multiple
+                                    setShowForwardModal(true);
+                                  }
+                                }
+                              }}
+                              className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-bold text-sm transition-all shadow-lg shadow-primary-500/20"
+                            >
+                              <FaShare className="w-3.5 h-3.5" />
+                              <span>Forward</span>
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (
+                                  window.confirm(
+                                    `Delete ${selectedMessages.length} messages?`,
+                                  )
+                                ) {
+                                  for (const mid of selectedMessages) {
+                                    await handleDeleteForMe(mid);
+                                  }
+                                  clearSelection();
+                                  toast.success("Messages deleted");
+                                }
+                              }}
+                              className="p-2.5 bg-neutral-100 dark:bg-neutral-700 hover:bg-error-50 dark:hover:bg-error-900/20 text-neutral-600 dark:text-neutral-400 hover:text-error-500 rounded-2xl transition-all"
+                            >
+                              <FaTrash className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   <ChatInput
                     onSendMessage={handleSendMessage}
@@ -586,6 +757,7 @@ function ChatPage() {
             onLeaveGroup={leaveGroup}
             onDeleteGroup={deleteGroup}
             onUpdateGroup={updateGroup}
+            messages={groupMessages}
           />
         )}
 
@@ -613,6 +785,32 @@ function ChatPage() {
             onClose={() => setClearingTarget(null)}
             onConfirm={handleClearChat}
             loading={isClearingChat}
+          />
+        )}
+
+        {showForwardModal && (
+          <ForwardModal
+            isOpen={showForwardModal}
+            onClose={() => {
+              setShowForwardModal(false);
+              setForwardingMessage(null);
+            }}
+            onForward={handleSelectForwardTarget}
+            users={users}
+            groups={groups}
+            currentUser={currentUser}
+          />
+        )}
+
+        {showMessageInfoModal && (
+          <MessageInfoModal
+            isOpen={showMessageInfoModal}
+            message={messageInfoTarget}
+            isGroup={!!selectedGroup}
+            onClose={() => {
+              setShowMessageInfoModal(false);
+              setMessageInfoTarget(null);
+            }}
           />
         )}
       </AnimatePresence>

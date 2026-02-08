@@ -912,6 +912,52 @@ export const useChat = () => {
     }
   };
 
+  const togglePin = async (messageId) => {
+    try {
+      const res = await api.post(`/messages/${messageId}/pin`);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageId
+            ? { ...m, isPinned: res.data.isPinned, pinnedAt: res.data.pinnedAt }
+            : m,
+        ),
+      );
+      toast.success(res.data.isPinned ? "Message pinned" : "Message unpinned");
+      return true;
+    } catch (err) {
+      console.error("Pin message error:", err);
+      toast.error("Failed to pin message");
+      return false;
+    }
+  };
+
+  const forwardMessage = async (messageId, targetUserId) => {
+    try {
+      const res = await api.post(`/messages/${messageId}/forward`, {
+        targetUserId,
+      });
+
+      // If the target user is the currently selected user, add to messages
+      if (selectedUserRef.current?._id === targetUserId) {
+        setMessages((prev) => [...prev, res.data]);
+      }
+
+      // Update conversation list for the target user
+      const previewText =
+        res.data.messageType === "text"
+          ? res.data.content
+          : `[${res.data.messageType}]`;
+      updateConversationList(targetUserId, `↪️ Forwarded: ${previewText}`);
+
+      toast.success("Message forwarded");
+      return true;
+    } catch (err) {
+      console.error("Forward message error:", err);
+      toast.error("Failed to forward message");
+      return false;
+    }
+  };
+
   const clearChat = async (userId, keepStarred = false) => {
     try {
       await api.delete(`/messages/clear/${userId}?keepStarred=${keepStarred}`);
@@ -967,6 +1013,8 @@ export const useChat = () => {
     muteUser,
     toggleFavorite,
     toggleStar,
+    togglePin,
+    forwardMessage,
     sendVideo,
     sendAudio,
     sendFile,

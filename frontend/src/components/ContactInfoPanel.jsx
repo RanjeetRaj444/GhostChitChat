@@ -22,6 +22,8 @@ import {
   FaCheck,
   FaPhone,
   FaVideo,
+  FaLink,
+  FaFileAlt,
 } from "react-icons/fa";
 import toast from "react-hot-toast";
 
@@ -51,6 +53,7 @@ function ContactInfoPanel({
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
+  const [activeGalleryTab, setActiveGalleryTab] = useState("media"); // media, docs, links
 
   if (!user) return null;
 
@@ -65,11 +68,22 @@ function ContactInfoPanel({
     ),
   );
 
-  // Get media messages (images)
+  // Get media messages (images, videos)
   const mediaMessages = messages.filter(
-    (msg) => msg.type === "image" || msg.image,
+    (msg) => msg.messageType === "image" || msg.messageType === "video",
   );
-  const mediaCount = mediaMessages.length;
+
+  // Get documents
+  const docMessages = messages.filter((msg) => msg.messageType === "file");
+
+  // Get links
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const linkMessages = messages.filter(
+    (msg) => msg.messageType === "text" && msg.content?.match(urlRegex),
+  );
+
+  const totalMediaLinksDocs =
+    mediaMessages.length + docMessages.length + linkMessages.length;
 
   // Get common groups
   const commonGroups = groups.filter((group) => {
@@ -136,12 +150,12 @@ function ContactInfoPanel({
     {
       icon: FaImage,
       label: "Media, links and docs",
-      count: mediaCount,
+      count: totalMediaLinksDocs,
       onClick: () => {
-        if (mediaCount > 0) {
+        if (totalMediaLinksDocs > 0) {
           setShowMediaGallery(true);
         } else {
-          toast("No media in this chat yet");
+          toast("No media, links or docs in this chat");
         }
       },
     },
@@ -355,32 +369,156 @@ function ContactInfoPanel({
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
         className="fixed md:relative inset-0 md:inset-auto h-full w-full md:w-[380px] md:min-w-[380px] bg-white dark:bg-neutral-900 md:border-l border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden z-50 md:z-auto"
       >
-        <div className="flex items-center px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-          <button
-            onClick={() => setShowMediaGallery(false)}
-            className="p-2 -ml-2 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-400 transition-colors"
-          >
-            <FaArrowLeft className="w-5 h-5" />
-          </button>
-          <h2 className="ml-4 text-lg font-semibold text-neutral-900 dark:text-white">
-            Media ({mediaCount})
-          </h2>
-        </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-          <div className="grid grid-cols-3 gap-1">
-            {mediaMessages.map((msg) => (
-              <div
-                key={msg._id}
-                className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden"
+        <div className="flex flex-col bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+          <div className="flex items-center px-4 py-3">
+            <button
+              onClick={() => setShowMediaGallery(false)}
+              className="p-2 -ml-2 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-400 transition-colors"
+            >
+              <FaArrowLeft className="w-5 h-5" />
+            </button>
+            <h2 className="ml-4 text-lg font-semibold text-neutral-900 dark:text-white">
+              Media, links and docs
+            </h2>
+          </div>
+
+          <div className="flex px-4">
+            {["media", "docs", "links"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveGalleryTab(tab)}
+                className={`flex-1 py-3 text-sm font-bold capitalize relative transition-colors ${
+                  activeGalleryTab === tab
+                    ? "text-primary-500"
+                    : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                }`}
               >
-                <img
-                  src={msg.image}
-                  alt="Media"
-                  className="w-full h-full object-cover hover:opacity-80 transition-opacity cursor-pointer"
-                />
-              </div>
+                {tab}
+                {activeGalleryTab === tab && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500"
+                  />
+                )}
+              </button>
             ))}
           </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <AnimatePresence mode="wait">
+            {activeGalleryTab === "media" && (
+              <motion.div
+                key="media"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="p-2 grid grid-cols-3 gap-1"
+              >
+                {mediaMessages.length > 0 ? (
+                  mediaMessages.map((msg) => (
+                    <div
+                      key={msg._id}
+                      className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden group relative"
+                    >
+                      <img
+                        src={msg.imageUrl || msg.image}
+                        alt="Media"
+                        className="w-full h-full object-cover hover:scale-110 transition-transform cursor-pointer"
+                      />
+                      {msg.messageType === "video" && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="w-8 h-8 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-white">
+                            <FaVideo className="w-3 h-3 ml-0.5" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-3 py-12 text-center text-neutral-500">
+                    No media found
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeGalleryTab === "docs" && (
+              <motion.div
+                key="docs"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="p-4 space-y-3"
+              >
+                {docMessages.length > 0 ? (
+                  docMessages.map((msg) => (
+                    <div
+                      key={msg._id}
+                      className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-2xl border border-neutral-100 dark:border-neutral-800 hover:bg-white dark:hover:bg-neutral-800 transition-all group"
+                    >
+                      <div className="w-11 h-11 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
+                        <FaFileAlt className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                          {msg.fileName || "Shared Document"}
+                        </p>
+                        <p className="text-[10px] text-neutral-500 font-medium">
+                          {new Date(msg.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-12 text-center text-neutral-500 font-medium">
+                    No documents shared
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeGalleryTab === "links" && (
+              <motion.div
+                key="links"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="p-4 space-y-3"
+              >
+                {linkMessages.length > 0 ? (
+                  linkMessages.flatMap((msg) => {
+                    const links = msg.content.match(urlRegex) || [];
+                    return links.map((link, i) => (
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        key={`${msg._id}-${i}`}
+                        className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-2xl border border-neutral-100 dark:border-neutral-800 hover:bg-white dark:hover:bg-neutral-800 transition-all group"
+                      >
+                        <div className="w-11 h-11 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
+                          <FaLink className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-primary-600 dark:text-primary-400 truncate">
+                            {link}
+                          </p>
+                          <p className="text-[10px] text-neutral-500 font-medium truncate">
+                            From: {msg.content}
+                          </p>
+                        </div>
+                      </a>
+                    ));
+                  })
+                ) : (
+                  <div className="py-12 text-center text-neutral-500 font-medium">
+                    No links shared
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     );

@@ -907,6 +907,59 @@ export const useGroupChat = () => {
     }
   };
 
+  const toggleGroupPin = async (messageId) => {
+    try {
+      const res = await api.post(`/group-messages/${messageId}/pin`);
+      setGroupMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageId
+            ? { ...m, isPinned: res.data.isPinned, pinnedAt: res.data.pinnedAt }
+            : m,
+        ),
+      );
+      toast.success(res.data.isPinned ? "Message pinned" : "Message unpinned");
+      return true;
+    } catch (err) {
+      console.error("Pin group message error:", err);
+      toast.error("Failed to pin message");
+      return false;
+    }
+  };
+
+  const forwardGroupMessage = async (
+    messageId,
+    { targetGroupId, targetUserId },
+  ) => {
+    try {
+      const res = await api.post(`/group-messages/${messageId}/forward`, {
+        targetGroupId,
+        targetUserId,
+      });
+
+      if (targetGroupId) {
+        // If the target group is the currently selected group, add to messages
+        if (selectedGroupRef.current?._id === targetGroupId) {
+          setGroupMessages((prev) => [...prev, res.data]);
+        }
+        const previewText =
+          res.data.messageType === "text"
+            ? res.data.content
+            : `[${res.data.messageType}]`;
+        updateGroupList(targetGroupId, `↪️ Forwarded: ${previewText}`);
+      } else if (targetUserId) {
+        // This would require updating the private chat list, which might be handled by socket/refresh
+        // But for now we just show success
+      }
+
+      toast.success("Message forwarded");
+      return true;
+    } catch (err) {
+      console.error("Forward group message error:", err);
+      toast.error("Failed to forward message");
+      return false;
+    }
+  };
+
   // Clear group chat history
   const clearGroupChat = async (groupId, keepStarred = false) => {
     if (!api) return false;
@@ -1009,6 +1062,8 @@ export const useGroupChat = () => {
     muteGroup,
     toggleGroupFavorite,
     toggleGroupStar,
+    toggleGroupPin,
+    forwardGroupMessage,
     sendGroupVideo,
     sendGroupAudio,
     sendGroupFile,

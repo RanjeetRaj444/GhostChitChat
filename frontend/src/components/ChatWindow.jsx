@@ -9,6 +9,7 @@ import {
   FaDownload,
   FaVideo,
   FaFile,
+  FaThumbtack,
 } from "react-icons/fa";
 import MessageActions from "./MessageActions";
 import ReplyPreview from "./ReplyPreview";
@@ -27,6 +28,13 @@ function ChatWindow({
   onDeleteForEveryone,
   onEdit,
   onToggleStar,
+  onTogglePin,
+  onForward,
+  onInfo,
+  onSelect,
+  isSelectionMode,
+  selectedMessages = [],
+  onToggleSelection,
   searchQuery = "",
   scrollTrigger = 0,
 }) {
@@ -36,6 +44,12 @@ function ChatWindow({
   const [lightboxImage, setLightboxImage] = useState(null);
   const [showReactionDetails, setShowReactionDetails] = useState(null); // { messageId, placement }
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  const pinnedMessages = useMemo(() => {
+    return messages.filter((m) => m.isPinned);
+  }, [messages]);
+
+  const latestPinnedMessage = pinnedMessages[pinnedMessages.length - 1];
 
   useEffect(() => {
     const handleGlobalClick = () => {
@@ -269,6 +283,38 @@ function ChatWindow({
       onScroll={handleScroll}
       className="flex-1 overflow-y-auto p-4 bg-neutral-100 dark:bg-neutral-900 scroll-smooth relative"
     >
+      <AnimatePresence>
+        {latestPinnedMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            onClick={() => scrollToMessage(latestPinnedMessage._id)}
+            className="sticky top-0 z-[40] mb-4 mx-auto w-full max-w-lg"
+          >
+            <div className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-md border border-white/20 dark:border-white/5 rounded-2xl p-3 shadow-xl cursor-pointer hover:bg-white/90 dark:hover:bg-neutral-800/90 transition-all group flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 shadow-inner">
+                <FaThumbtack className="w-4 h-4 transform group-hover:rotate-12 transition-transform" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-primary-600 dark:text-primary-400 uppercase tracking-tighter mb-0.5">
+                  {pinnedMessages.length > 1
+                    ? `Latest Pinned Message (${pinnedMessages.length})`
+                    : "Pinned Message"}
+                </p>
+                <p className="text-sm text-neutral-800 dark:text-neutral-200 truncate font-medium">
+                  {latestPinnedMessage.content ||
+                    `[${latestPinnedMessage.messageType}]`}
+                </p>
+              </div>
+              <div className="text-[10px] font-bold px-2 py-1 bg-neutral-100 dark:bg-neutral-700/50 rounded-lg text-neutral-500 group-hover:text-primary-500 transition-colors uppercase">
+                Jump
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {loading ? (
         <div className="flex justify-center items-center h-full">
           <div className="animate-pulse flex space-x-2">
@@ -340,503 +386,588 @@ function ChatWindow({
                       }}
                       className={`flex ${
                         isSentByCurrentUser ? "justify-end" : "justify-start"
-                      } mb-4 relative group`}
+                      } mb-4 relative group ${isSelectionMode ? "cursor-pointer" : ""}`}
+                      onClick={() =>
+                        isSelectionMode && onToggleSelection?.(message._id)
+                      }
                     >
-                      {!isSentByCurrentUser && (
-                        <motion.img
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          src={
-                            isGroup
-                              ? senderAvatar
-                              : selectedUser?.avatar || "/default-avatar.svg"
-                          }
-                          alt={
-                            isGroup
-                              ? senderName
-                              : selectedUser?.username || "User"
-                          }
-                          className="w-8 h-8 rounded-full mr-2 self-end shadow-sm"
-                        />
+                      {isSelectionMode && (
+                        <div className="absolute inset-0 z-10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-xl" />
                       )}
 
-                      <div className={`flex flex-col max-w-[75%] relative`}>
-                        {/* Show sender name in groups for messages not sent by current user */}
-                        {isGroup && !isSentByCurrentUser && (
-                          <span className="text-xs font-semibold text-primary-500 dark:text-primary-400 mb-1 ml-1 flex items-start">
-                            {senderName}
-                          </span>
+                      <div
+                        className={`flex items-center gap-2 ${isSentByCurrentUser ? "flex-row-reverse" : "flex-row"} w-full`}
+                      >
+                        {isSelectionMode && (
+                          <div
+                            className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all ${
+                              selectedMessages.includes(message._id)
+                                ? "bg-primary-500 border-primary-500 text-white"
+                                : "border-neutral-300 dark:border-neutral-600"
+                            }`}
+                          >
+                            {selectedMessages.includes(message._id) && (
+                              <FaCheck className="w-4 h-4" />
+                            )}
+                          </div>
                         )}
 
-                        <div className="flex items-center gap-2 group/bubble">
-                          {isSentByCurrentUser &&
-                            !isDeleted &&
-                            !message.isSending && (
-                              <MessageActions
-                                message={message}
-                                isSentByCurrentUser={isSentByCurrentUser}
-                                currentUserId={currentUser?._id}
-                                onReply={onReply}
-                                onReact={(messageId, emoji) =>
-                                  onReact?.(messageId, emoji)
-                                }
-                                onDeleteForMe={onDeleteForMe}
-                                onDeleteForEveryone={onDeleteForEveryone}
-                                onToggleStar={(mid) => onToggleStar?.(mid)}
-                                onEdit={onEdit}
-                                onCopy={handleCopy}
-                                onDownload={() => {
-                                  if (message.imageUrl)
-                                    handleDownload(
-                                      getImageUrl(message.imageUrl),
-                                      "image-" + message._id,
-                                    );
-                                  else if (message.videoUrl)
-                                    handleDownload(
-                                      getVideoUrl(message.videoUrl),
-                                      "video-" + message._id,
-                                    );
-                                  else if (message.audioUrl)
-                                    handleDownload(
-                                      getAudioUrl(message.audioUrl),
-                                      "audio-" + message._id,
-                                    );
-                                  else if (message.fileUrl)
-                                    handleDownload(
-                                      getFileUrl(message.fileUrl),
-                                      message.fileName,
-                                    );
-                                }}
-                                canEdit={canEditMessage(message)}
-                                canDeleteForEveryone={canDeleteForEveryoneMessage(
-                                  message,
-                                )}
-                              />
+                        <div
+                          className={`flex ${isSentByCurrentUser ? "justify-end" : "justify-start"} flex-1 items-end`}
+                        >
+                          {!isSentByCurrentUser && (
+                            <motion.img
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              src={
+                                isGroup
+                                  ? senderAvatar
+                                  : selectedUser?.avatar ||
+                                    "/default-avatar.svg"
+                              }
+                              alt={
+                                isGroup
+                                  ? senderName
+                                  : selectedUser?.username || "User"
+                              }
+                              className="w-8 h-8 rounded-full mr-2 self-end shadow-sm"
+                            />
+                          )}
+
+                          <div className={`flex flex-col max-w-[75%] relative`}>
+                            {/* Show sender name in groups for messages not sent by current user */}
+                            {isGroup && !isSentByCurrentUser && (
+                              <span className="text-xs font-semibold text-primary-500 dark:text-primary-400 mb-1 ml-1 flex items-start">
+                                {senderName}
+                              </span>
                             )}
 
-                          <div className="flex flex-col flex-1">
-                            {/* Reply preview inside message */}
-                            {message.replyTo && !isDeleted && (
-                              <div
-                                className={`${isSentByCurrentUser ? "bg-primary-700/30" : "bg-neutral-200 dark:bg-neutral-700"} rounded-xl rounded-b-none px-3 py-2`}
-                              >
-                                <ReplyPreview
-                                  replyTo={message.replyTo}
-                                  isInMessage={true}
-                                  onCancel={() =>
-                                    scrollToMessage(
-                                      message.replyTo._id || message.replyTo,
-                                    )
-                                  }
-                                />
-                              </div>
-                            )}
-
-                            {/* Message content */}
-                            {isDeleted ? (
-                              <motion.div
-                                layout
-                                className={`message-bubble italic ${
-                                  isSentByCurrentUser
-                                    ? "bg-neutral-400 dark:bg-neutral-600 text-neutral-200 rounded-br-none"
-                                    : "bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400 rounded-bl-none"
-                                }`}
-                              >
-                                🚫 This message was deleted
-                              </motion.div>
-                            ) : isImageMessage ? (
-                              <motion.div
-                                layout
-                                className={`relative cursor-pointer overflow-hidden rounded-2xl ${
-                                  isSentByCurrentUser
-                                    ? "rounded-br-none"
-                                    : "rounded-bl-none"
-                                } ${message.replyTo ? "rounded-t-none" : ""}`}
-                                onClick={() =>
-                                  setLightboxImage(
-                                    getImageUrl(message.imageUrl),
-                                  )
-                                }
-                                onDoubleClick={() =>
-                                  onReact?.(message._id, "❤️")
-                                }
-                              >
-                                <div className="group/media relative">
-                                  <img
-                                    src={getImageUrl(message.imageUrl)}
-                                    alt="Shared"
-                                    className="max-w-full max-h-[500px] object-cover rounded-2xl hover:scale-[1.01] transition-transform duration-500"
-                                    loading="lazy"
-                                  />
-                                  {message.isSending && (
-                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-2xl">
-                                      <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mb-2" />
-                                      <span className="text-[10px] text-white font-medium">
-                                        Sharing...
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {/* Image Metadata Overlay - Insta Style */}
-                                  <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 group-hover:bg-black/60 transition-colors">
-                                    {message.starredBy?.some(
-                                      (id) =>
-                                        (id._id || id).toString() ===
-                                        currentUser?._id.toString(),
-                                    ) && (
-                                      <FaStar className="w-2.5 h-2.5 text-yellow-400" />
-                                    )}
-                                    <span className="text-[10px] font-bold text-white/90 leading-none">
-                                      {formatMessageTime(message.createdAt)}
-                                    </span>
-                                    {isSentByCurrentUser && (
-                                      <div className="flex items-center h-3">
-                                        {message.isSending ? (
-                                          <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        ) : (
-                                          <div className="flex -space-x-1">
-                                            <span
-                                              className={`text-[10px] font-black ${message.isRead ? "text-primary-400" : "text-white/60"}`}
-                                            >
-                                              ✓
-                                            </span>
-                                            {message.isRead && (
-                                              <span className="text-[10px] font-black text-primary-400">
-                                                ✓
-                                              </span>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDownload(
-                                        getImageUrl(message.imageUrl),
-                                        "image-" + message._id,
-                                      );
-                                    }}
-                                    className="absolute top-2 left-2 p-2 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 text-white/90 opacity-0 group-hover/media:opacity-100 transition-all hover:bg-black/60 hover:scale-110"
-                                    title="Download"
-                                  >
-                                    <FaDownload className="w-4 h-4" />
-                                  </button>
-                                </div>
-                                <button
-                                  onClick={() =>
-                                    handleDownload(
-                                      getImageUrl(message.imageUrl),
-                                      "image-" + message._id,
-                                    )
-                                  }
-                                  className="absolute top-1.5 left-1.5 p-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-white/90 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Download"
-                                >
-                                  <FaDownload className="w-3.5 h-3.5" />
-                                </button>
-                              </motion.div>
-                            ) : isVideoMessage ? (
-                              <motion.div
-                                layout
-                                className={`relative overflow-hidden rounded-2xl ${
-                                  isSentByCurrentUser
-                                    ? "rounded-br-none"
-                                    : "rounded-bl-none"
-                                } ${message.replyTo ? "rounded-t-none" : ""}`}
-                              >
-                                <div
-                                  onDoubleClick={() =>
-                                    onReact?.(message._id, "❤️")
-                                  }
-                                  className="relative group/media overflow-hidden rounded-2xl bg-black"
-                                >
-                                  <video
-                                    key={message.videoUrl}
-                                    src={getVideoUrl(message.videoUrl)}
-                                    controls
-                                    preload="metadata"
-                                    playsInline
-                                    className="max-w-full max-h-[500px] rounded-2xl"
-                                  />
-                                  {message.isSending && (
-                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-2xl">
-                                      <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mb-2" />
-                                      <span className="text-[10px] text-white font-medium">
-                                        Compressing...
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {/* Video Metadata Overlay */}
-                                  <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
-                                    {message.starredBy?.some(
-                                      (id) =>
-                                        (id._id || id).toString() ===
-                                        currentUser?._id.toString(),
-                                    ) && (
-                                      <FaStar className="w-2.5 h-2.5 text-yellow-400" />
-                                    )}
-                                    <span className="text-[10px] font-bold text-white/90 leading-none">
-                                      {formatMessageTime(message.createdAt)}
-                                    </span>
-                                    {isSentByCurrentUser && (
-                                      <div className="flex items-center h-3">
-                                        {message.isSending ? (
-                                          <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        ) : (
-                                          <div className="flex -space-x-1">
-                                            <span
-                                              className={`text-[10px] font-black ${message.isRead ? "text-primary-400" : "text-white/60"}`}
-                                            >
-                                              ✓
-                                            </span>
-                                            {message.isRead && (
-                                              <span className="text-[10px] font-black text-primary-400">
-                                                ✓
-                                              </span>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <button
-                                    onClick={() =>
-                                      handleDownload(
-                                        getVideoUrl(message.videoUrl),
-                                        "video-" + message._id,
-                                      )
+                            <div className="flex items-center gap-2 group/bubble">
+                              {isSentByCurrentUser &&
+                                !isDeleted &&
+                                !message.isSending && (
+                                  <MessageActions
+                                    message={message}
+                                    isSentByCurrentUser={isSentByCurrentUser}
+                                    currentUserId={currentUser?._id}
+                                    onReply={onReply}
+                                    onReact={(messageId, emoji) =>
+                                      onReact?.(messageId, emoji)
                                     }
-                                    className="absolute top-2 left-2 p-2 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 text-white/90 opacity-0 group-hover/media:opacity-100 transition-all hover:bg-black/60"
-                                    title="Download"
-                                  >
-                                    <FaDownload className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </motion.div>
-                            ) : isAudioMessage ? (
-                              <motion.div
-                                layout
-                                className={`relative p-3 rounded-2xl ${
-                                  isSentByCurrentUser
-                                    ? "bg-primary-600 text-white rounded-br-none"
-                                    : "bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 rounded-bl-none"
-                                }`}
-                              >
-                                <div className="flex flex-col gap-2 min-w-[200px]">
-                                  <audio
-                                    src={getAudioUrl(message.audioUrl)}
-                                    controls
-                                    className="w-full h-10"
-                                  />
-                                  <div className="flex justify-between items-center text-[10px] opacity-70">
-                                    <span>Audio Message</span>
-                                    <div className="flex items-center gap-1">
-                                      {formatMessageTime(message.createdAt)}
-                                      {isSentByCurrentUser && (
-                                        <span>
-                                          {message.isRead ? "✓✓" : "✓"}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() =>
-                                    handleDownload(
-                                      getAudioUrl(message.audioUrl),
-                                      "audio-" + message._id,
-                                    )
-                                  }
-                                  className="absolute -top-2 -left-2 p-1.5 bg-neutral-800/80 backdrop-blur-md rounded-lg border border-white/10 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <FaDownload className="w-3 h-3" />
-                                </button>
-                              </motion.div>
-                            ) : isFileMessage ? (
-                              <motion.div
-                                layout
-                                className={`relative p-3 rounded-2xl flex items-center gap-3 ${
-                                  isSentByCurrentUser
-                                    ? "bg-primary-600 text-white rounded-br-none"
-                                    : "bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 rounded-bl-none"
-                                }`}
-                              >
-                                <div className="w-10 h-10 rounded-xl bg-black/10 flex items-center justify-center">
-                                  <FaFile className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">
-                                    {message.fileName || "Document"}
-                                  </p>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <button
-                                      onClick={() =>
+                                    onDeleteForMe={onDeleteForMe}
+                                    onDeleteForEveryone={onDeleteForEveryone}
+                                    onToggleStar={(mid) => onToggleStar?.(mid)}
+                                    onTogglePin={(mid) => onTogglePin?.(mid)}
+                                    onForward={(msg) => onForward?.(msg)}
+                                    onInfo={(msg) => onInfo?.(msg)}
+                                    onSelect={(mid) => onSelect?.(mid)}
+                                    onEdit={onEdit}
+                                    onCopy={handleCopy}
+                                    onDownload={() => {
+                                      if (message.imageUrl)
+                                        handleDownload(
+                                          getImageUrl(message.imageUrl),
+                                          "image-" + message._id,
+                                        );
+                                      else if (message.videoUrl)
+                                        handleDownload(
+                                          getVideoUrl(message.videoUrl),
+                                          "video-" + message._id,
+                                        );
+                                      else if (message.audioUrl)
+                                        handleDownload(
+                                          getAudioUrl(message.audioUrl),
+                                          "audio-" + message._id,
+                                        );
+                                      else if (message.fileUrl)
                                         handleDownload(
                                           getFileUrl(message.fileUrl),
                                           message.fileName,
-                                        )
-                                      }
-                                      className="text-[10px] font-bold underline hover:opacity-80"
-                                    >
-                                      Download
-                                    </button>
-                                    <span className="text-[10px] opacity-70">
-                                      {formatMessageTime(message.createdAt)}
+                                        );
+                                    }}
+                                    canEdit={canEditMessage(message)}
+                                    canDeleteForEveryone={canDeleteForEveryoneMessage(
+                                      message,
+                                    )}
+                                  />
+                                )}
+
+                              <div className="flex flex-col flex-1">
+                                {/* Forwarded label */}
+                                {message.isForwarded && !isDeleted && (
+                                  <div
+                                    className={`flex items-center gap-1 mb-1 px-1 opacity-70 ${isSentByCurrentUser ? "justify-end" : "justify-start"}`}
+                                  >
+                                    <FaShare className="w-2 h-2" />
+                                    <span className="text-[10px] font-bold italic uppercase tracking-wider">
+                                      Forwarded
                                     </span>
                                   </div>
-                                </div>
-                                {isSentByCurrentUser && (
-                                  <span className="text-[10px] self-end opacity-70 ml-2">
-                                    {message.isRead ? "✓✓" : "✓"}
-                                  </span>
                                 )}
-                              </motion.div>
-                            ) : (
-                              <motion.div
-                                layout
-                                className={`message-bubble inline-flex flex-wrap items-end gap-x-2 ${
-                                  isSentByCurrentUser
-                                    ? "message-sent rounded-br-none"
-                                    : "message-received rounded-bl-none"
-                                } ${message.replyTo ? "rounded-t-none" : ""}`}
-                              >
-                                <span>
-                                  {highlightText(message.content, searchQuery)}
-                                  {message.isEdited && (
-                                    <span className="ml-1 text-[10px] opacity-60">
-                                      (edited)
-                                    </span>
-                                  )}
-                                </span>
 
-                                <span className="inline-flex items-center gap-1 ml-auto self-end">
-                                  {message.starredBy?.some(
-                                    (id) =>
-                                      (id._id || id).toString() ===
-                                      currentUser?._id.toString(),
-                                  ) && (
-                                    <FaStar className="w-2.5 h-2.5 text-yellow-400 drop-shadow-sm" />
+                                {/* Pinned Indicator for Received Messages */}
+                                {!isSentByCurrentUser &&
+                                  message.isPinned &&
+                                  !isDeleted && (
+                                    <div className="flex items-center gap-1 mb-1 px-1 text-primary-500">
+                                      <FaThumbtack className="w-2.5 h-2.5" />
+                                      <span className="text-[9px] font-black uppercase tracking-widest">
+                                        Pinned
+                                      </span>
+                                    </div>
                                   )}
-                                  <span
-                                    className={`text-[10px] font-bold leading-none ${isSentByCurrentUser ? "text-primary-100/90" : "text-neutral-400"}`}
+
+                                {/* Reply preview inside message */}
+                                {message.replyTo && !isDeleted && (
+                                  <div
+                                    className={`${isSentByCurrentUser ? "bg-primary-700/30" : "bg-neutral-200 dark:bg-neutral-700"} rounded-xl rounded-b-none px-3 py-2`}
                                   >
-                                    {formatMessageTime(message.createdAt)}
-                                  </span>
-                                  {isSentByCurrentUser && (
-                                    <span className="inline-flex items-center h-3">
-                                      {message.isSending ? (
-                                        <span className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                      ) : (
-                                        <span className="inline-flex -space-x-1">
-                                          <span
-                                            className={`text-[10px] font-black ${message.isRead ? "text-primary-200" : "text-white/60"}`}
-                                          >
-                                            ✓
+                                    <ReplyPreview
+                                      replyTo={message.replyTo}
+                                      isInMessage={true}
+                                      onCancel={() =>
+                                        scrollToMessage(
+                                          message.replyTo._id ||
+                                            message.replyTo,
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Message content */}
+                                {isDeleted ? (
+                                  <motion.div
+                                    layout
+                                    className={`message-bubble italic ${
+                                      isSentByCurrentUser
+                                        ? "bg-neutral-400 dark:bg-neutral-600 text-neutral-200 rounded-br-none"
+                                        : "bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400 rounded-bl-none"
+                                    }`}
+                                  >
+                                    🚫 This message was deleted
+                                  </motion.div>
+                                ) : isImageMessage ? (
+                                  <motion.div
+                                    layout
+                                    className={`relative cursor-pointer overflow-hidden rounded-2xl ${
+                                      isSentByCurrentUser
+                                        ? "rounded-br-none"
+                                        : "rounded-bl-none"
+                                    } ${message.replyTo ? "rounded-t-none" : ""}`}
+                                    onClick={() =>
+                                      setLightboxImage(
+                                        getImageUrl(message.imageUrl),
+                                      )
+                                    }
+                                    onDoubleClick={() =>
+                                      onReact?.(message._id, "❤️")
+                                    }
+                                  >
+                                    <div className="group/media relative">
+                                      <img
+                                        src={getImageUrl(message.imageUrl)}
+                                        alt="Shared"
+                                        className="max-w-full max-h-[500px] object-cover rounded-2xl hover:scale-[1.01] transition-transform duration-500"
+                                        loading="lazy"
+                                      />
+                                      {message.isSending && (
+                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-2xl">
+                                          <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mb-2" />
+                                          <span className="text-[10px] text-white font-medium">
+                                            Sharing...
                                           </span>
-                                          {message.isRead && (
-                                            <span className="text-[10px] font-black text-primary-200">
-                                              ✓
+                                        </div>
+                                      )}
+
+                                      {/* Image Metadata Overlay - Insta Style */}
+                                      <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 group-hover:bg-black/60 transition-colors">
+                                        {message.isPinned && (
+                                          <FaThumbtack className="w-2 h-2 text-primary-400 rotate-45" />
+                                        )}
+                                        {message.starredBy?.some(
+                                          (id) =>
+                                            (id._id || id).toString() ===
+                                            currentUser?._id.toString(),
+                                        ) && (
+                                          <FaStar className="w-2.5 h-2.5 text-yellow-400" />
+                                        )}
+                                        <span className="text-[10px] font-bold text-white/90 leading-none">
+                                          {formatMessageTime(message.createdAt)}
+                                        </span>
+                                        {isSentByCurrentUser && (
+                                          <div className="flex items-center h-3">
+                                            {message.isSending ? (
+                                              <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                              <div className="flex -space-x-1">
+                                                <span
+                                                  className={`text-[10px] font-black ${message.isRead ? "text-primary-400" : "text-white/60"}`}
+                                                >
+                                                  ✓
+                                                </span>
+                                                {message.isRead && (
+                                                  <span className="text-[10px] font-black text-primary-400">
+                                                    ✓
+                                                  </span>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDownload(
+                                            getImageUrl(message.imageUrl),
+                                            "image-" + message._id,
+                                          );
+                                        }}
+                                        className="absolute top-2 left-2 p-2 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 text-white/90 opacity-0 group-hover/media:opacity-100 transition-all hover:bg-black/60 hover:scale-110"
+                                        title="Download"
+                                      >
+                                        <FaDownload className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        handleDownload(
+                                          getImageUrl(message.imageUrl),
+                                          "image-" + message._id,
+                                        )
+                                      }
+                                      className="absolute top-1.5 left-1.5 p-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-white/90 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      title="Download"
+                                    >
+                                      <FaDownload className="w-3.5 h-3.5" />
+                                    </button>
+                                  </motion.div>
+                                ) : isVideoMessage ? (
+                                  <motion.div
+                                    layout
+                                    className={`relative overflow-hidden rounded-2xl ${
+                                      isSentByCurrentUser
+                                        ? "rounded-br-none"
+                                        : "rounded-bl-none"
+                                    } ${message.replyTo ? "rounded-t-none" : ""}`}
+                                  >
+                                    <div
+                                      onDoubleClick={() =>
+                                        onReact?.(message._id, "❤️")
+                                      }
+                                      className="relative group/media overflow-hidden rounded-2xl bg-black"
+                                    >
+                                      <video
+                                        key={message.videoUrl}
+                                        src={getVideoUrl(message.videoUrl)}
+                                        controls
+                                        preload="metadata"
+                                        playsInline
+                                        className="max-w-full max-h-[500px] rounded-2xl"
+                                      />
+                                      {message.isSending && (
+                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-2xl">
+                                          <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mb-2" />
+                                          <span className="text-[10px] text-white font-medium">
+                                            Compressing...
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      {/* Video Metadata Overlay */}
+                                      <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
+                                        {message.isPinned && (
+                                          <FaThumbtack className="w-2 h-2 text-primary-400 rotate-45" />
+                                        )}
+                                        {message.starredBy?.some(
+                                          (id) =>
+                                            (id._id || id).toString() ===
+                                            currentUser?._id.toString(),
+                                        ) && (
+                                          <FaStar className="w-2.5 h-2.5 text-yellow-400" />
+                                        )}
+                                        <span className="text-[10px] font-bold text-white/90 leading-none">
+                                          {formatMessageTime(message.createdAt)}
+                                        </span>
+                                        {isSentByCurrentUser && (
+                                          <div className="flex items-center h-3">
+                                            {message.isSending ? (
+                                              <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                              <div className="flex -space-x-1">
+                                                <span
+                                                  className={`text-[10px] font-black ${message.isRead ? "text-primary-400" : "text-white/60"}`}
+                                                >
+                                                  ✓
+                                                </span>
+                                                {message.isRead && (
+                                                  <span className="text-[10px] font-black text-primary-400">
+                                                    ✓
+                                                  </span>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <button
+                                        onClick={() =>
+                                          handleDownload(
+                                            getVideoUrl(message.videoUrl),
+                                            "video-" + message._id,
+                                          )
+                                        }
+                                        className="absolute top-2 left-2 p-2 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 text-white/90 opacity-0 group-hover/media:opacity-100 transition-all hover:bg-black/60"
+                                        title="Download"
+                                      >
+                                        <FaDownload className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                ) : isAudioMessage ? (
+                                  <motion.div
+                                    layout
+                                    className={`relative p-3 rounded-2xl ${
+                                      isSentByCurrentUser
+                                        ? "bg-primary-600 text-white rounded-br-none"
+                                        : "bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 rounded-bl-none"
+                                    }`}
+                                  >
+                                    <div className="flex flex-col gap-2 min-w-[200px]">
+                                      <audio
+                                        src={getAudioUrl(message.audioUrl)}
+                                        controls
+                                        className="w-full h-10"
+                                      />
+                                      <div className="flex justify-between items-center text-[10px] opacity-70">
+                                        <span>Audio Message</span>
+                                        <div className="flex items-center gap-1">
+                                          {formatMessageTime(message.createdAt)}
+                                          {isSentByCurrentUser && (
+                                            <span>
+                                              {message.isRead ? "✓✓" : "✓"}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        handleDownload(
+                                          getAudioUrl(message.audioUrl),
+                                          "audio-" + message._id,
+                                        )
+                                      }
+                                      className="absolute -top-2 -left-2 p-1.5 bg-neutral-800/80 backdrop-blur-md rounded-lg border border-white/10 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <FaDownload className="w-3 h-3" />
+                                    </button>
+                                  </motion.div>
+                                ) : isFileMessage ? (
+                                  <motion.div
+                                    layout
+                                    className={`relative p-3 rounded-2xl flex items-center gap-3 ${
+                                      isSentByCurrentUser
+                                        ? "bg-primary-600 text-white rounded-br-none"
+                                        : "bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 rounded-bl-none"
+                                    }`}
+                                  >
+                                    <div className="w-10 h-10 rounded-xl bg-black/10 flex items-center justify-center">
+                                      <FaFile className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">
+                                        {message.fileName || "Document"}
+                                      </p>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <button
+                                          onClick={() =>
+                                            handleDownload(
+                                              getFileUrl(message.fileUrl),
+                                              message.fileName,
+                                            )
+                                          }
+                                          className="text-[10px] font-bold underline hover:opacity-80"
+                                        >
+                                          Download
+                                        </button>
+                                        {message.isPinned && (
+                                          <FaThumbtack className="w-2.5 h-2.5 text-primary-500 rotate-45" />
+                                        )}
+                                        <span className="text-[10px] opacity-70">
+                                          {formatMessageTime(message.createdAt)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {isSentByCurrentUser && (
+                                      <span className="text-[10px] self-end opacity-70 ml-2">
+                                        {message.isRead ? "✓✓" : "✓"}
+                                      </span>
+                                    )}
+                                  </motion.div>
+                                ) : (
+                                  <motion.div
+                                    layout
+                                    className={`message-bubble inline-flex flex-wrap items-end gap-x-2 ${
+                                      isSentByCurrentUser
+                                        ? "message-sent rounded-br-none"
+                                        : "message-received rounded-bl-none"
+                                    } ${message.replyTo ? "rounded-t-none" : ""}`}
+                                  >
+                                    <span>
+                                      {highlightText(
+                                        message.content,
+                                        searchQuery,
+                                      )}
+                                      {message.isEdited && (
+                                        <span className="ml-1 text-[10px] opacity-60">
+                                          (edited)
+                                        </span>
+                                      )}
+                                    </span>
+
+                                    <span className="inline-flex items-center gap-1 ml-auto self-end">
+                                      {message.isPinned && (
+                                        <FaThumbtack className="w-2.5 h-2.5 text-primary-500 rotate-45" />
+                                      )}
+                                      {message.starredBy?.some(
+                                        (id) =>
+                                          (id._id || id).toString() ===
+                                          currentUser?._id.toString(),
+                                      ) && (
+                                        <FaStar className="w-2.5 h-2.5 text-yellow-400 drop-shadow-sm" />
+                                      )}
+                                      <span
+                                        className={`text-[10px] font-bold leading-none ${isSentByCurrentUser ? "text-primary-100/90" : "text-neutral-400"}`}
+                                      >
+                                        {formatMessageTime(message.createdAt)}
+                                      </span>
+                                      {isSentByCurrentUser && (
+                                        <span className="inline-flex items-center h-3">
+                                          {message.isSending ? (
+                                            <span className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                          ) : (
+                                            <span className="inline-flex -space-x-1">
+                                              <span
+                                                className={`text-[10px] font-black ${message.isRead ? "text-primary-200" : "text-white/60"}`}
+                                              >
+                                                ✓
+                                              </span>
+                                              {message.isRead && (
+                                                <span className="text-[10px] font-black text-primary-200">
+                                                  ✓
+                                                </span>
+                                              )}
                                             </span>
                                           )}
                                         </span>
                                       )}
                                     </span>
-                                  )}
-                                </span>
-                              </motion.div>
-                            )}
-                          </div>
-
-                          {!isSentByCurrentUser &&
-                            !isDeleted &&
-                            !message.isSending && (
-                              <MessageActions
-                                message={message}
-                                isSentByCurrentUser={isSentByCurrentUser}
-                                currentUserId={currentUser?._id}
-                                onReply={onReply}
-                                onReact={(messageId, emoji) =>
-                                  onReact?.(messageId, emoji)
-                                }
-                                onDeleteForMe={onDeleteForMe}
-                                onDeleteForEveryone={onDeleteForEveryone}
-                                onToggleStar={(mid) => onToggleStar?.(mid)}
-                                onEdit={onEdit}
-                                onCopy={handleCopy}
-                                onDownload={() => {
-                                  if (message.imageUrl)
-                                    handleDownload(
-                                      getImageUrl(message.imageUrl),
-                                      "image-" + message._id,
-                                    );
-                                  else if (message.videoUrl)
-                                    handleDownload(
-                                      getVideoUrl(message.videoUrl),
-                                      "video-" + message._id,
-                                    );
-                                  else if (message.audioUrl)
-                                    handleDownload(
-                                      getAudioUrl(message.audioUrl),
-                                      "audio-" + message._id,
-                                    );
-                                  else if (message.fileUrl)
-                                    handleDownload(
-                                      getFileUrl(message.fileUrl),
-                                      message.fileName,
-                                    );
-                                }}
-                                canEdit={canEditMessage(message)}
-                                canDeleteForEveryone={canDeleteForEveryoneMessage(
-                                  message,
+                                  </motion.div>
                                 )}
-                              />
-                            )}
-                        </div>
-                        {/* Reactions display */}
-                        {reactions.length > 0 && !isDeleted && (
-                          <div
-                            className={`flex flex-wrap gap-1 mt-1 ${isSentByCurrentUser ? "justify-end" : "justify-start"} relative`}
-                          >
-                            {reactions.map((r, i) => (
-                              <motion.div
-                                key={i}
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white dark:bg-neutral-800 rounded-full border border-neutral-200 dark:border-neutral-700 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                                title={r.users.join(", ")}
-                                onClick={(e) => handleReactionClick(e, message)}
+                              </div>
+
+                              {!isSentByCurrentUser &&
+                                !isDeleted &&
+                                !message.isSending && (
+                                  <MessageActions
+                                    message={message}
+                                    isSentByCurrentUser={isSentByCurrentUser}
+                                    currentUserId={currentUser?._id}
+                                    onReply={onReply}
+                                    onReact={(messageId, emoji) =>
+                                      onReact?.(messageId, emoji)
+                                    }
+                                    onDeleteForMe={onDeleteForMe}
+                                    onDeleteForEveryone={onDeleteForEveryone}
+                                    onToggleStar={(mid) => onToggleStar?.(mid)}
+                                    onTogglePin={(mid) => onTogglePin?.(mid)}
+                                    onForward={(msg) => onForward?.(msg)}
+                                    onInfo={(msg) => onInfo?.(msg)}
+                                    onSelect={(mid) => onSelect?.(mid)}
+                                    onEdit={onEdit}
+                                    onCopy={handleCopy}
+                                    onDownload={() => {
+                                      if (message.imageUrl)
+                                        handleDownload(
+                                          getImageUrl(message.imageUrl),
+                                          "image-" + message._id,
+                                        );
+                                      else if (message.videoUrl)
+                                        handleDownload(
+                                          getVideoUrl(message.videoUrl),
+                                          "video-" + message._id,
+                                        );
+                                      else if (message.audioUrl)
+                                        handleDownload(
+                                          getAudioUrl(message.audioUrl),
+                                          "audio-" + message._id,
+                                        );
+                                      else if (message.fileUrl)
+                                        handleDownload(
+                                          getFileUrl(message.fileUrl),
+                                          message.fileName,
+                                        );
+                                    }}
+                                    canEdit={canEditMessage(message)}
+                                    canDeleteForEveryone={canDeleteForEveryoneMessage(
+                                      message,
+                                    )}
+                                  />
+                                )}
+                            </div>
+                            {/* Reactions display */}
+                            {reactions.length > 0 && !isDeleted && (
+                              <div
+                                className={`flex flex-wrap gap-1 mt-1 ${isSentByCurrentUser ? "justify-end" : "justify-start"} relative`}
                               >
-                                <span className="text-sm">{r.emoji}</span>
-                                {r.count > 1 && (
-                                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                                    {r.count}
-                                  </span>
-                                )}
-                              </motion.div>
-                            ))}
+                                {reactions.map((r, i) => (
+                                  <motion.div
+                                    key={i}
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white dark:bg-neutral-800 rounded-full border border-neutral-200 dark:border-neutral-700 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                                    title={r.users.join(", ")}
+                                    onClick={(e) =>
+                                      handleReactionClick(e, message)
+                                    }
+                                  >
+                                    <span className="text-sm">{r.emoji}</span>
+                                    {r.count > 1 && (
+                                      <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                        {r.count}
+                                      </span>
+                                    )}
+                                  </motion.div>
+                                ))}
 
-                            <AnimatePresence>
-                              {showReactionDetails?.messageId ===
-                                message._id && (
-                                <ReactionDetails
-                                  message={message}
-                                  currentUser={currentUser}
-                                  placement={showReactionDetails.placement}
-                                  onClose={() => setShowReactionDetails(null)}
-                                  onRemoveReaction={(mid, emoji, target) => {
-                                    onReact?.(mid, emoji, target);
-                                  }}
-                                />
-                              )}
-                            </AnimatePresence>
+                                <AnimatePresence>
+                                  {showReactionDetails?.messageId ===
+                                    message._id && (
+                                    <ReactionDetails
+                                      message={message}
+                                      currentUser={currentUser}
+                                      placement={showReactionDetails.placement}
+                                      onClose={() =>
+                                        setShowReactionDetails(null)
+                                      }
+                                      onRemoveReaction={(
+                                        mid,
+                                        emoji,
+                                        target,
+                                      ) => {
+                                        onReact?.(mid, emoji, target);
+                                      }}
+                                    />
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
-
                       {isSentByCurrentUser && (
                         <motion.img
                           initial={{ scale: 0 }}

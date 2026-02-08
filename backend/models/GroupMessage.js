@@ -108,6 +108,18 @@ const groupMessageSchema = new mongoose.Schema(
         ref: "ChatUser",
       },
     ],
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+    pinnedAt: {
+      type: Date,
+      default: null,
+    },
+    isForwarded: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

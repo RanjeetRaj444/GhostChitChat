@@ -10,6 +10,11 @@ import {
   FaUserMinus,
   FaCrown,
   FaCheck,
+  FaImage,
+  FaVideo,
+  FaFileAlt,
+  FaLink,
+  FaArrowLeft,
 } from "react-icons/fa";
 
 function GroupInfoModal({
@@ -23,7 +28,10 @@ function GroupInfoModal({
   onLeaveGroup,
   onDeleteGroup,
   onUpdateGroup,
+  messages = [],
 }) {
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
+  const [activeGalleryTab, setActiveGalleryTab] = useState("media");
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(group?.name || "");
   const [editDescription, setEditDescription] = useState(
@@ -32,6 +40,18 @@ function GroupInfoModal({
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [selectedNewMembers, setSelectedNewMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Media, Links, Docs Filters
+  const mediaMessages = messages.filter(
+    (msg) => msg.messageType === "image" || msg.messageType === "video",
+  );
+  const docMessages = messages.filter((msg) => msg.messageType === "file");
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const linkMessages = messages.filter(
+    (msg) => msg.messageType === "text" && msg.content?.match(urlRegex),
+  );
+  const totalMediaLinksDocs =
+    mediaMessages.length + docMessages.length + linkMessages.length;
 
   const isAdmin = group?.admins?.some(
     (admin) => (admin._id || admin) === currentUserId,
@@ -206,6 +226,31 @@ function GroupInfoModal({
               )}
             </div>
 
+            {/* Media, links and docs section */}
+            <div className="mb-6">
+              <button
+                onClick={() =>
+                  totalMediaLinksDocs > 0 && setShowMediaGallery(true)
+                }
+                className="w-full flex items-center p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-700/30 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
+                  <FaImage className="w-5 h-5" />
+                </div>
+                <div className="ml-3 flex-1 text-left">
+                  <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Media, links and docs
+                  </p>
+                  <p className="text-[10px] text-neutral-500 font-medium">
+                    {totalMediaLinksDocs} items shared
+                  </p>
+                </div>
+                <span className="text-neutral-400 group-hover:translate-x-1 transition-transform">
+                  →
+                </span>
+              </button>
+            </div>
+
             {/* Add Members Section */}
             <AnimatePresence>
               {showAddMembers && (
@@ -336,6 +381,170 @@ function GroupInfoModal({
               </button>
             )}
           </div>
+
+          {/* Media Gallery Overlay-style within modal boundaries or as another panel */}
+          <AnimatePresence>
+            {showMediaGallery && (
+              <motion.div
+                initial={{ x: "100%", opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: "100%", opacity: 0 }}
+                className="absolute inset-0 bg-white dark:bg-neutral-900 z-[60] flex flex-col"
+              >
+                <div className="flex flex-col bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+                  <div className="flex items-center px-4 py-3">
+                    <button
+                      onClick={() => setShowMediaGallery(false)}
+                      className="p-2 -ml-2 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-400 transition-colors"
+                    >
+                      <FaArrowLeft className="w-5 h-5" />
+                    </button>
+                    <h2 className="ml-4 text-lg font-semibold text-neutral-900 dark:text-white">
+                      Media, links and docs
+                    </h2>
+                  </div>
+
+                  <div className="flex px-4">
+                    {["media", "docs", "links"].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveGalleryTab(tab)}
+                        className={`flex-1 py-3 text-sm font-bold capitalize relative transition-colors ${
+                          activeGalleryTab === tab
+                            ? "text-primary-500"
+                            : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                        }`}
+                      >
+                        {tab}
+                        {activeGalleryTab === tab && (
+                          <motion.div
+                            layoutId="groupActiveGalleryTab"
+                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500"
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <AnimatePresence mode="wait">
+                    {activeGalleryTab === "media" && (
+                      <motion.div
+                        key="media"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="p-2 grid grid-cols-3 gap-1"
+                      >
+                        {mediaMessages.length > 0 ? (
+                          mediaMessages.map((msg) => (
+                            <div
+                              key={msg._id}
+                              className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden group relative"
+                            >
+                              <img
+                                src={msg.imageUrl || msg.image}
+                                alt="Media"
+                                className="w-full h-full object-cover hover:scale-110 transition-transform cursor-pointer"
+                              />
+                              {msg.messageType === "video" && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                  <div className="w-8 h-8 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-white">
+                                    <FaVideo className="w-3 h-3 ml-0.5" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="col-span-3 py-12 text-center text-neutral-500">
+                            No media found
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+
+                    {activeGalleryTab === "docs" && (
+                      <motion.div
+                        key="docs"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        className="p-4 space-y-3"
+                      >
+                        {docMessages.length > 0 ? (
+                          docMessages.map((msg) => (
+                            <div
+                              key={msg._id}
+                              className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-2xl border border-neutral-100 dark:border-neutral-800 hover:bg-white dark:hover:bg-neutral-800 transition-all group"
+                            >
+                              <div className="w-11 h-11 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
+                                <FaFileAlt className="w-5 h-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                                  {msg.fileName || "Shared Document"}
+                                </p>
+                                <p className="text-[10px] text-neutral-500 font-medium">
+                                  {new Date(msg.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-12 text-center text-neutral-500 font-medium">
+                            No documents shared
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+
+                    {activeGalleryTab === "links" && (
+                      <motion.div
+                        key="links"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        className="p-4 space-y-3"
+                      >
+                        {linkMessages.length > 0 ? (
+                          linkMessages.flatMap((msg) => {
+                            const links = msg.content.match(urlRegex) || [];
+                            return links.map((link, i) => (
+                              <a
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                key={`${msg._id}-${i}`}
+                                className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-2xl border border-neutral-100 dark:border-neutral-800 hover:bg-white dark:hover:bg-neutral-800 transition-all group"
+                              >
+                                <div className="w-11 h-11 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
+                                  <FaLink className="w-5 h-5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-primary-600 dark:text-primary-400 truncate">
+                                    {link}
+                                  </p>
+                                  <p className="text-[10px] text-neutral-500 font-medium truncate">
+                                    From: {msg.content}
+                                  </p>
+                                </div>
+                              </a>
+                            ));
+                          })
+                        ) : (
+                          <div className="py-12 text-center text-neutral-500 font-medium">
+                            No links shared
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </motion.div>

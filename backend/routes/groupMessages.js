@@ -615,11 +615,90 @@ router.post("/:messageId/star", auth, async (req, res) => {
     await message.save();
     res.json({
       success: true,
-      isStarred: !isStarred,
+      isStarred: message.starredBy.includes(currentUserId),
       starredBy: message.starredBy,
     });
   } catch (error) {
     console.error("Star group message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Toggle pin status of a group message
+router.post("/:messageId/pin", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const message = await GroupMessage.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    message.isPinned = !message.isPinned;
+    message.pinnedAt = message.isPinned ? new Date() : null;
+
+    await message.save();
+    res.json(message);
+  } catch (error) {
+    console.error("Pin group message error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Forward a group message to another group or user
+router.post("/:messageId/forward", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { targetGroupId, targetUserId } = req.body;
+
+    const originalMessage = await GroupMessage.findById(messageId);
+    if (!originalMessage) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    let forwardedMessage;
+
+    if (targetGroupId) {
+      forwardedMessage = new GroupMessage({
+        group: targetGroupId,
+        sender: req.user._id,
+        content: originalMessage.content,
+        messageType: originalMessage.messageType,
+        imageUrl: originalMessage.imageUrl,
+        videoUrl: originalMessage.videoUrl,
+        audioUrl: originalMessage.audioUrl,
+        fileUrl: originalMessage.fileUrl,
+        fileName: originalMessage.fileName,
+        isForwarded: true,
+        readBy: [{ user: req.user._id, readAt: new Date() }],
+      });
+    } else if (targetUserId) {
+      // Forward from group to private chat
+      const Message = (await import("../models/Message.js")).default;
+      forwardedMessage = new Message({
+        sender: req.user._id,
+        receiver: targetUserId,
+        content: originalMessage.content,
+        messageType: originalMessage.messageType,
+        imageUrl: originalMessage.imageUrl,
+        videoUrl: originalMessage.videoUrl,
+        audioUrl: originalMessage.audioUrl,
+        fileUrl: originalMessage.fileUrl,
+        fileName: originalMessage.fileName,
+        isForwarded: true,
+      });
+    }
+
+    if (!forwardedMessage) {
+      return res.status(400).json({ message: "Invalid target" });
+    }
+
+    await forwardedMessage.save();
+    await forwardedMessage.populate("sender", "username avatar");
+
+    res.status(201).json(forwardedMessage);
+  } catch (error) {
+    console.error("Forward group message error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

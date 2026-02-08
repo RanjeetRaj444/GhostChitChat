@@ -30,7 +30,11 @@ function MessageActions({
   onEdit,
   onCopy,
   onToggleStar,
+  onTogglePin,
+  onForward,
   onDownload,
+  onInfo,
+  onSelect,
   canEdit,
   canDeleteForEveryone,
 }) {
@@ -86,6 +90,16 @@ function MessageActions({
 
   const handleDeleteForEveryone = () => {
     onDeleteForEveryone?.(message._id);
+    setShowMenu(false);
+  };
+
+  const handlePin = () => {
+    onTogglePin?.(message._id);
+    setShowMenu(false);
+  };
+
+  const handleForward = () => {
+    onForward?.(message);
     setShowMenu(false);
   };
 
@@ -188,7 +202,13 @@ function MessageActions({
 
             {/* Menu Items - Scrollable if needed */}
             <div className="space-y-0.5 overflow-y-auto custom-scrollbar pr-0.5">
-              <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-white/10 rounded-xl transition-colors text-left group">
+              <button
+                onClick={() => {
+                  onInfo?.(message);
+                  setShowMenu(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-white/10 rounded-xl transition-colors text-left group"
+              >
                 <FaInfoCircle className="w-4 h-4 text-white/50 group-hover:text-white" />
                 <span>Message info</span>
               </button>
@@ -211,14 +231,22 @@ function MessageActions({
                 </button>
               )}
 
-              <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-white/10 rounded-xl transition-colors text-left group">
+              <button
+                onClick={handleForward}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-white/10 rounded-xl transition-colors text-left group"
+              >
                 <FaShare className="w-4 h-4 text-white/50 group-hover:text-white" />
                 <span>Forward</span>
               </button>
 
-              <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-white/10 rounded-xl transition-colors text-left group">
-                <FaThumbtack className="w-4 h-4 text-white/50 group-hover:text-white" />
-                <span>Pin</span>
+              <button
+                onClick={handlePin}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-white/10 rounded-xl transition-colors text-left group"
+              >
+                <FaThumbtack
+                  className={`w-4 h-4 ${message.isPinned ? "text-primary-400" : "text-white/50 group-hover:text-white"}`}
+                />
+                <span>{message.isPinned ? "Unpin" : "Pin"}</span>
               </button>
 
               <button
@@ -233,7 +261,13 @@ function MessageActions({
 
               <div className="h-px bg-white/10 my-1 mx-2" />
 
-              <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-white/10 rounded-xl transition-colors text-left group">
+              <button
+                onClick={() => {
+                  onSelect?.(message._id);
+                  setShowMenu(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-white/10 rounded-xl transition-colors text-left group"
+              >
                 <FaCheckSquare className="w-4 h-4 text-white/50 group-hover:text-white" />
                 <span>Select</span>
               </button>
