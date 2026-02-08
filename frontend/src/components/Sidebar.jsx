@@ -120,9 +120,16 @@ function Sidebar({
     <div className="w-full md:w-80 bg-white dark:bg-neutral-800 border-r border-neutral-200 dark:border-neutral-700 flex flex-col transition-all duration-300">
       {/* Header */}
       <div className="p-4 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
-        <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-500 dark:to-secondary-500">
-          G-ChitChat
-        </h1>
+        <div className="flex items-center gap-3 ">
+          <img
+            src="/logo.png"
+            alt="Logo"
+            className="w-12 h-12 object-contain drop-shadow-sm bg-neutral-800 rounded-lg p-1"
+          />
+          <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-500 dark:to-secondary-500">
+            G-ChitChat
+          </h1>
+        </div>
 
         <div className="flex space-x-1">
           <button

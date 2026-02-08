@@ -648,11 +648,11 @@ function ChatPage() {
                       transition={{ delay: 0.2 }}
                       className="mb-8 flex justify-center"
                     >
-                      <div className="bg-white dark:bg-neutral-800 p-6 rounded-2xl shadow-xl shadow-primary-500/10 ring-1 ring-black/5 dark:ring-white/10">
+                      <div className="bg-neutral-800 p-6 rounded-2xl shadow-xl shadow-primary-500/10 ring-1 ring-black/5 dark:ring-white/10">
                         <img
-                          src="/vite.svg"
+                          src="/logo.png"
                           alt="Logo"
-                          className="w-20 h-20 opacity-80"
+                          className="w-[8rem] h-[8rem] opacity-80"
                         />
                       </div>
                     </motion.div>
