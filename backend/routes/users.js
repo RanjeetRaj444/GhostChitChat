@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import Message from "../models/Message.js";
 import Report from "../models/Report.js";
 import { auth } from "../middleware/auth.js";
+import { deleteFromCloudinary } from "../utils/cloudinary.js"; // Import
 
 const router = express.Router();
 
@@ -53,7 +54,15 @@ router.put("/profile", auth, async (req, res) => {
     }
 
     if (bio !== undefined) user.bio = bio;
-    if (avatar) user.avatar = avatar;
+
+    // Check if avatar is being updated
+    if (avatar && avatar !== user.avatar) {
+      // Delete old avatar from Cloudinary if it exists and is not the default one
+      if (user.avatar && !user.avatar.includes("ui-avatars.com")) {
+        await deleteFromCloudinary(user.avatar);
+      }
+      user.avatar = avatar;
+    }
 
     await user.save();
 
@@ -117,6 +126,24 @@ router.delete("/contacts/:id", auth, async (req, res) => {
         $addToSet: { deletedFor: userId },
       },
     );
+
+    // 3. Clean up orphaned messages (deleted by both)
+    const orphanedMessages = await Message.find({
+      $or: [
+        { sender: userId, receiver: contactId },
+        { sender: contactId, receiver: userId },
+      ],
+      deletedFor: { $all: [userId, contactId] },
+    });
+
+    for (const msg of orphanedMessages) {
+      if (msg.imageUrl) await deleteFromCloudinary(msg.imageUrl);
+      if (msg.videoUrl) await deleteFromCloudinary(msg.videoUrl);
+      if (msg.audioUrl) await deleteFromCloudinary(msg.audioUrl);
+      if (msg.fileUrl) await deleteFromCloudinary(msg.fileUrl);
+
+      await Message.findByIdAndDelete(msg._id);
+    }
 
     res.json({ success: true, message: "Contact and chat data removed" });
   } catch (error) {

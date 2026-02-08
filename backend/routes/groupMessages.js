@@ -3,8 +3,66 @@ import GroupMessage from "../models/GroupMessage.js";
 import Group from "../models/Group.js";
 import { auth } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
+import { deleteFromCloudinary } from "../utils/cloudinary.js";
 
 const router = express.Router();
+// ... (keep routes until delete-for-everyone)
+
+// Delete group message for everyone (only sender or admin can do this)
+router.delete("/:messageId/delete-for-everyone", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+
+    const message = await GroupMessage.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    const group = await Group.findById(message.group);
+    const isAdmin = group.admins.some(
+      (a) => a.toString() === req.user._id.toString(),
+    );
+    const isSender = message.sender.toString() === req.user._id.toString();
+
+    if (!isSender && !isAdmin) {
+      return res
+        .status(403)
+        .json({ message: "Only sender or admin can delete for everyone" });
+    }
+
+    // Check if message is within 1 hour (for non-admins)
+    if (!isAdmin) {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      if (message.createdAt < oneHourAgo) {
+        return res.status(400).json({
+          message: "Can only delete messages within 1 hour of sending",
+        });
+      }
+    }
+
+    // Delete media from Cloudinary if exists
+    if (message.imageUrl) await deleteFromCloudinary(message.imageUrl);
+    if (message.videoUrl) await deleteFromCloudinary(message.videoUrl);
+    if (message.audioUrl) await deleteFromCloudinary(message.audioUrl);
+    if (message.fileUrl) await deleteFromCloudinary(message.fileUrl);
+
+    message.deletedForEveryone = true;
+    message.deletedAt = new Date();
+    message.content = "";
+    message.imageUrl = null;
+    message.videoUrl = null;
+    message.audioUrl = null;
+    message.fileUrl = null;
+    message.fileName = null;
+
+    await message.save();
+
+    res.json({ success: true, messageId, groupId: message.group });
+  } catch (error) {
+    console.error("Delete group message for everyone error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // Send text message to group
 router.post("/", auth, async (req, res) => {
@@ -439,13 +497,18 @@ router.delete("/:messageId/delete-for-me", auth, async (req, res) => {
   try {
     const { messageId } = req.params;
 
-    const message = await GroupMessage.findById(messageId);
+    const message = await GroupMessage.findById(messageId).populate("group");
     if (!message) {
       return res.status(404).json({ message: "Message not found" });
     }
 
     // Check if user is a member of the group
-    const group = await Group.findById(message.group);
+    // Note: message.group is now populated properly
+    if (!message.group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const group = message.group;
     const isMember = group.members.some(
       (m) => m.toString() === req.user._id.toString(),
     );
@@ -458,61 +521,33 @@ router.delete("/:messageId/delete-for-me", auth, async (req, res) => {
       message.deletedFor.push(req.user._id);
     }
 
+    // Check for orphans (all current members have deleted it)
+    let allMembersDeleted = true;
+    for (const memberId of group.members) {
+      if (
+        !message.deletedFor.some((id) => id.toString() === memberId.toString())
+      ) {
+        allMembersDeleted = false;
+        break;
+      }
+    }
+
+    if (allMembersDeleted) {
+      // Permanently delete
+      if (message.imageUrl) await deleteFromCloudinary(message.imageUrl);
+      if (message.videoUrl) await deleteFromCloudinary(message.videoUrl);
+      if (message.audioUrl) await deleteFromCloudinary(message.audioUrl);
+      if (message.fileUrl) await deleteFromCloudinary(message.fileUrl);
+
+      await GroupMessage.findByIdAndDelete(messageId);
+      return res.json({ success: true, messageId, deletedPermanently: true });
+    }
+
     await message.save();
 
     res.json({ success: true, messageId });
   } catch (error) {
     console.error("Delete group message for me error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Delete group message for everyone (only sender or admin can do this)
-router.delete("/:messageId/delete-for-everyone", auth, async (req, res) => {
-  try {
-    const { messageId } = req.params;
-
-    const message = await GroupMessage.findById(messageId);
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
-    }
-
-    const group = await Group.findById(message.group);
-    const isAdmin = group.admins.some(
-      (a) => a.toString() === req.user._id.toString(),
-    );
-    const isSender = message.sender.toString() === req.user._id.toString();
-
-    if (!isSender && !isAdmin) {
-      return res
-        .status(403)
-        .json({ message: "Only sender or admin can delete for everyone" });
-    }
-
-    // Check if message is within 1 hour (for non-admins)
-    if (!isAdmin) {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      if (message.createdAt < oneHourAgo) {
-        return res.status(400).json({
-          message: "Can only delete messages within 1 hour of sending",
-        });
-      }
-    }
-
-    message.deletedForEveryone = true;
-    message.deletedAt = new Date();
-    message.content = "";
-    message.imageUrl = null;
-    message.videoUrl = null;
-    message.audioUrl = null;
-    message.fileUrl = null;
-    message.fileName = null;
-
-    await message.save();
-
-    res.json({ success: true, messageId, groupId: message.group });
-  } catch (error) {
-    console.error("Delete group message for everyone error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

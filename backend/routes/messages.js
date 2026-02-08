@@ -3,8 +3,120 @@ import Message from "../models/Message.js";
 import { auth } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
 import mongoose from "mongoose";
+import { deleteFromCloudinary } from "../utils/cloudinary.js";
 
 const router = express.Router();
+
+// ... existing routes ...
+
+// Delete message for everyone (only sender can do this)
+router.delete("/:messageId/delete-for-everyone", auth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Only sender can delete for everyone
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res
+        .status(403)
+        .json({ message: "Only sender can delete for everyone" });
+    }
+
+    // Check if message is within 1 hour (like WhatsApp)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    if (message.createdAt < oneHourAgo) {
+      return res.status(400).json({
+        message: "Can only delete messages within 1 hour of sending",
+      });
+    }
+
+    // Delete media from Cloudinary if exists
+    if (message.imageUrl) await deleteFromCloudinary(message.imageUrl);
+    if (message.videoUrl) await deleteFromCloudinary(message.videoUrl);
+    if (message.audioUrl) await deleteFromCloudinary(message.audioUrl);
+    if (message.fileUrl) await deleteFromCloudinary(message.fileUrl);
+
+    message.deletedForEveryone = true;
+    message.deletedAt = new Date();
+    message.content = "";
+    message.imageUrl = null;
+    message.videoUrl = null;
+    message.audioUrl = null;
+    message.fileUrl = null;
+    message.fileName = null;
+
+    await message.save();
+
+    res.json({ success: true, messageId, receiverId: message.receiver });
+  } catch (error) {
+    console.error("Delete message for everyone error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ... inside clear chat ...
+// Clear conversation history (delete for me only)
+router.delete("/clear/:userId", auth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { keepStarred } = req.query; // true/false
+    const currentUserId = req.user._id;
+
+    const query = {
+      $or: [
+        { sender: currentUserId, receiver: userId },
+        { sender: userId, receiver: currentUserId },
+      ],
+      deletedFor: { $ne: currentUserId },
+    };
+
+    if (keepStarred === "true") {
+      query.starredBy = { $ne: currentUserId };
+    }
+
+    // Update messages to add current user to deletedFor
+    await Message.updateMany(query, {
+      $push: { deletedFor: currentUserId },
+    });
+
+    // Clean up orphaned messages (deleted by both sender and receiver)
+    // Find messages where both sender and receiver are in deletedFor
+    // Only process messages that involved these two users
+    const orphanedMessages = await Message.find({
+      $or: [
+        { sender: currentUserId, receiver: userId },
+        { sender: userId, receiver: currentUserId },
+      ],
+      // We need to check if both sender and receiver are in deletedFor
+      // But since we know the participants are currentUserId and userId,
+      // we can check if deletedFor contains BOTH of them.
+      deletedFor: { $all: [currentUserId, userId] },
+    });
+
+    // Delete media for orphaned messages and remove them from DB
+    for (const msg of orphanedMessages) {
+      if (msg.imageUrl) await deleteFromCloudinary(msg.imageUrl);
+      if (msg.videoUrl) await deleteFromCloudinary(msg.videoUrl);
+      if (msg.audioUrl) await deleteFromCloudinary(msg.audioUrl);
+      if (msg.fileUrl) await deleteFromCloudinary(msg.fileUrl);
+
+      await Message.findByIdAndDelete(msg._id);
+    }
+
+    res.json({
+      success: true,
+      message: "Chat cleared",
+      count: orphanedMessages.length, // or orphaned count
+    });
+  } catch (error) {
+    console.error("Clear chat error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // Send text message
 router.post("/", auth, async (req, res) => {
@@ -445,54 +557,30 @@ router.delete("/:messageId/delete-for-me", auth, async (req, res) => {
       message.deletedFor.push(req.user._id);
     }
 
+    // Check for orphans (both participants deleted it)
+    const senderDeleted = message.deletedFor.some(
+      (id) => id.toString() === message.sender.toString(),
+    );
+    const receiverDeleted = message.deletedFor.some(
+      (id) => id.toString() === message.receiver.toString(),
+    );
+
+    if (senderDeleted && receiverDeleted) {
+      // Permanently delete
+      if (message.imageUrl) await deleteFromCloudinary(message.imageUrl);
+      if (message.videoUrl) await deleteFromCloudinary(message.videoUrl);
+      if (message.audioUrl) await deleteFromCloudinary(message.audioUrl);
+      if (message.fileUrl) await deleteFromCloudinary(message.fileUrl);
+
+      await Message.findByIdAndDelete(messageId);
+      return res.json({ success: true, messageId, deletedPermanently: true });
+    }
+
     await message.save();
 
     res.json({ success: true, messageId });
   } catch (error) {
     console.error("Delete message for me error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Delete message for everyone (only sender can do this)
-router.delete("/:messageId/delete-for-everyone", auth, async (req, res) => {
-  try {
-    const { messageId } = req.params;
-
-    const message = await Message.findById(messageId);
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
-    }
-
-    // Only sender can delete for everyone
-    if (message.sender.toString() !== req.user._id.toString()) {
-      return res
-        .status(403)
-        .json({ message: "Only sender can delete for everyone" });
-    }
-
-    // Check if message is within 1 hour (like WhatsApp)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    if (message.createdAt < oneHourAgo) {
-      return res.status(400).json({
-        message: "Can only delete messages within 1 hour of sending",
-      });
-    }
-
-    message.deletedForEveryone = true;
-    message.deletedAt = new Date();
-    message.content = "";
-    message.imageUrl = null;
-    message.videoUrl = null;
-    message.audioUrl = null;
-    message.fileUrl = null;
-    message.fileName = null;
-
-    await message.save();
-
-    res.json({ success: true, messageId, receiverId: message.receiver });
-  } catch (error) {
-    console.error("Delete message for everyone error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -541,41 +629,6 @@ router.put("/:messageId/edit", auth, async (req, res) => {
     res.json(message);
   } catch (error) {
     console.error("Edit message error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Clear conversation history (delete for me only)
-router.delete("/clear/:userId", auth, async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { keepStarred } = req.query; // true/false
-    const currentUserId = req.user._id;
-
-    const query = {
-      $or: [
-        { sender: currentUserId, receiver: userId },
-        { sender: userId, receiver: currentUserId },
-      ],
-      deletedFor: { $ne: currentUserId },
-    };
-
-    if (keepStarred === "true") {
-      query.starredBy = { $ne: currentUserId };
-    }
-
-    // Update all messages in this conversation to include current user in deletedFor
-    const result = await Message.updateMany(query, {
-      $push: { deletedFor: currentUserId },
-    });
-
-    res.json({
-      success: true,
-      message: "Chat cleared",
-      count: result.modifiedCount,
-    });
-  } catch (error) {
-    console.error("Clear chat error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

@@ -1,8 +1,56 @@
 import express from "express";
 import Group from "../models/Group.js";
+import GroupMessage from "../models/GroupMessage.js"; // Import GroupMessage
 import { auth } from "../middleware/auth.js";
+import { deleteFromCloudinary } from "../utils/cloudinary.js"; // Import
 
 const router = express.Router();
+
+// ... existing routes ...
+
+// Delete group (creator only)
+router.delete("/:groupId", auth, async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    if (group.createdBy.toString() !== req.user._id.toString()) {
+      return res
+        .status(403)
+        .json({ message: "Only the creator can delete the group" });
+    }
+
+    // 1. Find all messages in this group
+    const messages = await GroupMessage.find({ group: group._id });
+
+    // 2. Delete media for all messages
+    for (const msg of messages) {
+      if (msg.imageUrl) await deleteFromCloudinary(msg.imageUrl);
+      if (msg.videoUrl) await deleteFromCloudinary(msg.videoUrl);
+      if (msg.audioUrl) await deleteFromCloudinary(msg.audioUrl);
+      if (msg.fileUrl) await deleteFromCloudinary(msg.fileUrl);
+    }
+
+    // 3. Delete all messages
+    await GroupMessage.deleteMany({ group: group._id });
+
+    // 4. Delete group avatar if it's not default
+    if (group.avatar && !group.avatar.includes("ui-avatars.com")) {
+      await deleteFromCloudinary(group.avatar);
+    }
+
+    // 5. Delete the group
+    await Group.findByIdAndDelete(req.params.groupId);
+
+    res.json({ message: "Group deleted successfully" });
+  } catch (error) {
+    console.error("Delete group error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // Create a new group
 router.post("/", auth, async (req, res) => {
@@ -212,30 +260,6 @@ router.delete("/:groupId/leave", auth, async (req, res) => {
     res.json({ message: "Left group successfully" });
   } catch (error) {
     console.error("Leave group error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Delete group (creator only)
-router.delete("/:groupId", auth, async (req, res) => {
-  try {
-    const group = await Group.findById(req.params.groupId);
-
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
-    }
-
-    if (group.createdBy.toString() !== req.user._id.toString()) {
-      return res
-        .status(403)
-        .json({ message: "Only the creator can delete the group" });
-    }
-
-    await Group.findByIdAndDelete(req.params.groupId);
-
-    res.json({ message: "Group deleted successfully" });
-  } catch (error) {
-    console.error("Delete group error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
