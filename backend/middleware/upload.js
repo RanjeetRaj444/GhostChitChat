@@ -28,7 +28,6 @@ const storage = new CloudinaryStorage({
       resourceType = "video";
       folder = "chat/videos";
     } else if (file.mimetype.startsWith("audio")) {
-      resourceType = "video"; // Cloudinary treats audio as video for resource_type usually, or "auto" works. Let's use "auto" for audio to be safe.
       folder = "chat/audio";
       resourceType = "auto";
     } else {
@@ -39,7 +38,9 @@ const storage = new CloudinaryStorage({
     return {
       folder: folder,
       resource_type: resourceType,
-      public_id: `${Date.now()}-${Math.round(Math.random() * 1e9)}-${path.parse(file.originalname).name}`,
+      public_id: `${Date.now()}-${Math.round(Math.random() * 1e9)}-${path
+        .parse(file.originalname)
+        .name.replace(/[^a-zA-Z0-9]/g, "_")}`,
       // Keep original extension for raw files if needed, but Cloudinary handles it.
       // format: ... (optional)
     };
