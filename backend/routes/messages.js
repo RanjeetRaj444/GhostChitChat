@@ -66,7 +66,7 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
       return res.status(400).json({ message: "No image provided" });
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const imageUrl = req.file.path;
 
     // Check for blocks
     const receiver = await mongoose.model("ChatUser").findById(receiverId);
@@ -121,7 +121,7 @@ router.post("/video", auth, upload.single("video"), async (req, res) => {
       return res.status(400).json({ message: "No video provided" });
     }
 
-    const videoUrl = `/uploads/${req.file.filename}`;
+    const videoUrl = req.file.path;
 
     // Check for blocks
     const receiver = await mongoose.model("ChatUser").findById(receiverId);
@@ -176,7 +176,7 @@ router.post("/audio", auth, upload.single("audio"), async (req, res) => {
       return res.status(400).json({ message: "No audio provided" });
     }
 
-    const audioUrl = `/uploads/${req.file.filename}`;
+    const audioUrl = req.file.path;
 
     const receiver = await mongoose.model("ChatUser").findById(receiverId);
     if (!receiver) return res.status(404).json({ message: "User not found" });
@@ -229,7 +229,7 @@ router.post("/file", auth, upload.single("file"), async (req, res) => {
       return res.status(400).json({ message: "No file provided" });
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileUrl = req.file.path;
     const fileName = req.file.originalname;
 
     const receiver = await mongoose.model("ChatUser").findById(receiverId);

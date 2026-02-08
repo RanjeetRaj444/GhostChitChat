@@ -82,7 +82,7 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
       return res.status(403).json({ message: "Not a member of this group" });
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const imageUrl = req.file.path;
 
     const message = new GroupMessage({
       group: groupId,
@@ -139,7 +139,7 @@ router.post("/video", auth, upload.single("video"), async (req, res) => {
       return res.status(403).json({ message: "Not a member of this group" });
     }
 
-    const videoUrl = `/uploads/${req.file.filename}`;
+    const videoUrl = req.file.path;
 
     const message = new GroupMessage({
       group: groupId,
@@ -192,7 +192,7 @@ router.post("/audio", auth, upload.single("audio"), async (req, res) => {
       return res.status(403).json({ message: "Not a member of this group" });
     }
 
-    const audioUrl = `/uploads/${req.file.filename}`;
+    const audioUrl = req.file.path;
 
     const message = new GroupMessage({
       group: groupId,
@@ -244,7 +244,7 @@ router.post("/file", auth, upload.single("file"), async (req, res) => {
       return res.status(403).json({ message: "Not a member of this group" });
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileUrl = req.file.path;
     const fileName = req.file.originalname;
 
     const message = new GroupMessage({
